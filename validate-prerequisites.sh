@@ -20,13 +20,45 @@ else
     FAILED_CHECKS+=("AWS CLI")
 fi
 
+# Load AWS_PROFILE from .env/iceberg.env if it exists and AWS_PROFILE is not already set
+ENV_FILE=".env/iceberg.env"
+if [ -z "$AWS_PROFILE" ] && [ -f "$ENV_FILE" ]; then
+    # Check if AWS_PROFILE is defined in the file
+    if grep -q "^AWS_PROFILE=" "$ENV_FILE" 2>/dev/null; then
+        # Extract and export AWS_PROFILE value
+        ENV_AWS_PROFILE=$(grep "^AWS_PROFILE=" "$ENV_FILE" | cut -d'=' -f2 | tr -d ' "' | tr -d "'")
+        if [ -n "$ENV_AWS_PROFILE" ]; then
+            export AWS_PROFILE="$ENV_AWS_PROFILE"
+            echo ""
+            echo "ℹ️  Loaded AWS_PROFILE from .env/iceberg.env: $AWS_PROFILE"
+        fi
+    fi
+fi
+
 # Check if AWS credentials are configured
 echo "----------------------------------------------------------"
+AWS_PROFILE_MSG=""
+if [ -n "$AWS_PROFILE" ]; then
+    AWS_PROFILE_MSG=" (using profile: $AWS_PROFILE)"
+fi
+
 if aws sts get-caller-identity --region "${AWS_REGION:-us-east-1}" >/dev/null 2>&1; then
-    echo "✅ AWS credentials are configured."
+    CALLER_IDENTITY=$(aws sts get-caller-identity --region "${AWS_REGION:-us-east-1}" --output json 2>/dev/null)
+    ACCOUNT_ID=$(echo "$CALLER_IDENTITY" | grep -o '"Account": "[^"]*"' | cut -d'"' -f4)
+    USER_ARN=$(echo "$CALLER_IDENTITY" | grep -o '"Arn": "[^"]*"' | cut -d'"' -f4)
+    
+    echo "✅ AWS credentials are configured${AWS_PROFILE_MSG}."
+    if [ -n "$ACCOUNT_ID" ]; then
+        echo "   Account: $ACCOUNT_ID"
+        echo "   Identity: $(basename "$USER_ARN")"
+    fi
 else
-    echo "❌ Error: AWS credentials are not configured."
+    echo "❌ Error: AWS credentials are not configured${AWS_PROFILE_MSG}."
     echo "   Please run: aws configure"
+    if [ -n "$AWS_PROFILE" ]; then
+        echo "   Or configure profile: aws configure --profile $AWS_PROFILE"
+    fi
+    echo "   Tip: You can set AWS_PROFILE environment variable to use a specific profile"
     FAILURE_COUNT=$((FAILURE_COUNT + 1))
     FAILED_CHECKS+=("AWS credentials")
 fi
@@ -123,7 +155,7 @@ if [ $FAILURE_COUNT -eq 0 ]; then
     echo ""
     echo "All prerequisites have been validated successfully!"
     
-    # Create tasks directory if it doesn't exist
+    # Ensure tasks directory exists (may already exist with tracked files)
     TASKS_DIR="tasks"
     mkdir -p "$TASKS_DIR"
     
