@@ -32,6 +32,7 @@ Your actual environment configuration. This file is git-ignored and contains sen
 4. Optional values:
    - `AWS_PROFILE` - AWS profile to use (uncomment and set if using named profiles)
    - `AWS_S3_BUCKET` - Your S3 bucket name
+   - `AWS_S3_FOLDER` - S3 folder/prefix for organizing Iceberg data
    - `SNOWFLAKE_ACCOUNT` - Your Snowflake account identifier
    - `SNOWFLAKE_WAREHOUSE` - Snowflake warehouse name
    - `SNOWFLAKE_DATABASE` - Snowflake database name
@@ -49,6 +50,7 @@ Your actual environment configuration. This file is git-ignored and contains sen
 | `AWS_PROFILE` | No | - | AWS profile name (if not set, uses default credential chain) |
 | `AWS_REGION` | **Yes** | us-east-1 | AWS region for S3 and services |
 | `AWS_S3_BUCKET` | No | dgillis-dev | S3 bucket for Iceberg tables |
+| `AWS_S3_FOLDER` | No | snowflake-iceberg | S3 folder/prefix for Iceberg data |
 | `SNOWFLAKE_ACCOUNT` | No | - | Snowflake account identifier |
 | `SNOWFLAKE_WAREHOUSE` | No | COMPUTE_WH | Snowflake warehouse name |
 | `SNOWFLAKE_DATABASE` | No | iceberg_db | Snowflake database name |

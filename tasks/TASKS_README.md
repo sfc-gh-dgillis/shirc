@@ -219,7 +219,7 @@ chmod +x validate-prerequisites.sh check-validation.sh
 
 ## See Also
 
-- [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md) - Comprehensive validation documentation
-- [README.md](README.md) - Main project documentation
+- [VALIDATION_GUIDE.md](../VALIDATION_GUIDE.md) - Comprehensive validation documentation
+- [README.md](../README.md) - Main project documentation
 - `.gitignore` - Git ignore configuration
 

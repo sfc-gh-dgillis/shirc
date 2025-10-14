@@ -64,6 +64,6 @@ task aws:create-bucket
 
 ## See Also
 
-- [TASKS_README.md](../TASKS_README.md) - Detailed documentation about the validation flag
+- [TASKS_README.md](TASKS_README.md) - Detailed documentation about the validation flag
 - [Taskfile.yml](../Taskfile.yml) - Main task definitions
 - [validate-prerequisites.sh](../validate-prerequisites.sh) - Prerequisites validation script

@@ -13,6 +13,7 @@ if [ ! -f "$VALIDATION_FLAG" ]; then
 fi
 
 # Read validation info
+# shellcheck source=tasks/.validated_prerequisites.sh
 source "$VALIDATION_FLAG"
 
 echo "✅ Prerequisites validated"

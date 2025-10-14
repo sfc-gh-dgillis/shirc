@@ -6,10 +6,16 @@
 
 set -e  # Exit on error
 
-# Configuration
-BUCKET_NAME="dgillis-dev"
-REGION="${AWS_DEFAULT_REGION:-us-east-1}"
-FOLDER_NAME="snowflake-iceberg"
+# Load configuration from .env file if it exists
+ENV_FILE=".env/iceberg.env"
+if [ -f "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+fi
+
+# Configuration with defaults
+BUCKET_NAME="${AWS_S3_BUCKET:-dgillis-dev}"
+REGION="${AWS_REGION:-us-east-1}"
+FOLDER_NAME="${AWS_S3_FOLDER:-snowflake-iceberg}"
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║           AWS S3 Bucket Creation Script                    ║"
