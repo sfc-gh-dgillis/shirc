@@ -1,0 +1,23 @@
+version: '3'
+
+tasks:
+
+  make-s3-bucket:
+    desc: Creates an s3 bucket.
+    cmds:
+      - chmod +x ./tasks/aws-cli/cmd/make-bucket.sh && ./tasks/aws-cli/cmd/make-bucket.sh "{{.S3_BUCKET_NAME}}" "{{.AWS_REGION}}"
+
+  delete-s3-bucket:
+    desc: Deletes an s3 bucket (must be empty).
+    cmds:
+      - chmod +x ./tasks/aws-cli/cmd/delete-bucket.sh && ./tasks/aws-cli/cmd/delete-bucket.sh "{{.S3_BUCKET_NAME}}" "{{.FORCE}}"
+
+  generate-iam-policy-for-s3-bucket-access:
+    desc: Generates an IAM policy json document for accessing an s3 bucket from a template.
+    cmds:
+      - chmod +x ./tasks/aws-cli/cmd/generate-iam-policy-for-bucket-access.sh && ./tasks/aws-cli/cmd/generate-iam-policy-for-bucket-access.sh "{{.S3_BUCKET_NAME}}" "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}" "{{.S3_PREFIX}}"
+
+  upload-files-to-s3:
+    desc: Uploads all files in the tasks/aws-cli/upload directory to the provided S3 bucket
+    cmds:
+      - ./tasks/aws-cli/cmd/upload_to_s3.sh "{{.BUCKET_NAME_OR_S3_URI}}" "{{.S3_OPTIONAL_PREFIX}}"
