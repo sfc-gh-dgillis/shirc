@@ -14,7 +14,11 @@ tasks:
 
   generate-iam-policy-for-s3-bucket-access:
     desc: Generates an IAM policy json document for accessing an s3 bucket from a template.
+    vars:
+      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "tasks/aws-cli/json/template/bucket-policy-template.json"}}'
+      OUTPUT_FILE: '{{.OUTPUT_FILE | default "tasks/aws-cli/json/output/bucket-policy-output.json"}}'
     cmds:
+      - mkdir -p tasks/aws-cli/json/output
       - chmod +x ./tasks/aws-cli/cmd/generate-iam-policy-for-bucket-access.sh && ./tasks/aws-cli/cmd/generate-iam-policy-for-bucket-access.sh "{{.S3_BUCKET_NAME}}" "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}" "{{.S3_PREFIX}}"
 
   upload-files-to-s3:
