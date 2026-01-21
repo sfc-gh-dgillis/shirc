@@ -1,126 +1,21 @@
 version: '3'
 
 includes:
-  admin: ./tasks/admin-tasks.yml
-  cli: ./tasks/cli-tasks.yml
-  ssh: ./tasks/ssh-tasks.yml
+  validate-prerequisites: ./tasks/validate-prerequisites/validate-prerequisite-tasks.yml
+  aws-cli: ./tasks/aws-cli/awscli-tasks.yml
 
 env:
   ENV_DIR: .env
   TEMP_DIR: tmp
 
-dotenv: ['{{.ENV_DIR}}/{{env "FILENAME"}}']
+dotenv: ['{{ .ENV_DIR }}/{{ .DOTENV_FILENAME | default "iceberg.env" }}']
 
 tasks:
-  init-accountadmin:
-    summary: |
-      Initialize the Snowflake ACCOUNTADMIN connections.
 
-      Given you have the password for the ACCOUNTADMIN, this task will create the
-      initial connection (connection will not store password). The filename to store
-      the initial ACCOUNTADMIN password connection details must be named 
-      init-accountadmin-connection.env and be in the .env directory. In addition, a
-      second connection will be created using the SSH keypair method. This is done by
-      creating a new file named init-keypair-connection.env in the same directory.
-      
-      Next, MFA connection caching will be set to TRUE for the instance. Next a new
-      set of ssh keys will be created and added to ~/.ssh/snowflake as well as adding
-      the public key to the ACCOUNTADMIN user account in Snowflake. This initialization
-      allows for only using your ssh key instead of ever having to use a password and is
-      more secure and convenient.
+  make-s3-bucket:
+    desc: Create an S3 bucket using AWS CLI.
     cmds:
-      - task: cli:init-config-toml
-      - task: cli:add-connection
+      - task: aws-cli:make-s3-bucket
         vars:
-          CONNECTION_NAME: $IA_PASSWORD_CONNECTION_NAME
-          CONNECTION_ACCOUNT: $IA_CONNECTION_ACCOUNT
-          CONNECTION_USERNAME: $IA_CONNECTION_USERNAME
-          CONNECTION_ROLE: $IA_CONNECTION_ROLE
-          CHECK_CONNECTION_PASSWORD_ENV: TRUE
-      - task: cli:connection-test
-        vars:
-          CONNECTION_NAME: $IA_PASSWORD_CONNECTION_NAME
-          CONNECTION_TYPE: PASSWORD
-      - task: admin:set-mfa-caching
-        vars:
-          CONNECTION_NAME: $IA_PASSWORD_CONNECTION_NAME
-      - task: ssh:gen-ssh-dir
-      - task: ssh:gen-rsa-keys
-        vars:
-          PRIVATE_KEY_FILE_PATH:
-            sh: python3 ./pyut/key_name.py $IA_KEYPAIR_CONNECTION_NAME private
-          PUBLIC_KEY_FILE_PATH:
-            sh: python3 ./pyut/key_name.py $IA_KEYPAIR_CONNECTION_NAME public
-      - task: cli:add-connection
-        vars:
-          CONNECTION_NAME: $IA_KEYPAIR_CONNECTION_NAME
-          CONNECTION_ACCOUNT: $IA_CONNECTION_ACCOUNT
-          CONNECTION_USERNAME: $IA_CONNECTION_USERNAME
-          CONNECTION_ROLE: $IA_CONNECTION_ROLE
-          CONNECTION_PRIVATE_KEY_FILE_PATH:
-            sh: python3 ./pyut/key_name.py $IA_KEYPAIR_CONNECTION_NAME private
-      - task: rsa:prep-public-key-sql
-        vars:
-          TEMP_DIR: $TEMP_DIR
-          PUBLIC_KEY_FILE_PATH:
-            sh: python3 ./pyut/key_name.py $IA_KEYPAIR_CONNECTION_NAME public
-          ASSOCIATE_KEY_WITH_USERNAME: $IA_CONNECTION_USERNAME
-      - task: rsa:add-rsa-key-to-snowflake
-        vars:
-          TEMP_DIR: $TEMP_DIR
-          AUTH_CONNECTION_NAME: $IA_PASSWORD_CONNECTION_NAME
-      - task: cli:connection-test
-        vars:gmail
-          CONNECTION_NAME: $IA_KEYPAIR_CONNECTION_NAME
-          CONNECTION_TYPE: KEYPAIR
-
-  create-user:
-    summary: |
-      Create the USER and grant any roles in the GRANT_ROLES environment variable. 
-      Variable should have a JSON string which has no spaces, e.g. '["USERADMIN"]'.
-      Usage: `FILENAME=some-file-name.env task create-user`
-
-    cmds:
-      - task: admin:create-user
-      - task: admin:grant-roles
-        vars:
-          ROLES_TO_GRANT: $GRANT_ROLES
-          USER_TO_GRANT: $CREATE_USER_LOGIN_NAME
-          AUTH_CONNECTION_NAME: $AUTH_CONNECTION_NAME
-
-  create-keypair-connection:
-    summary: |
-      Create the KEYPAIR connection. Usage: `FILENAME=some-file-name.env task create-keypair-connection`
-
-      This task will create a new connection using the SSH keypair method.
-      
-      A new set of ssh keys will be created and added to ~/.ssh/snowflake as well
-      as adding the public key to the user account in Snowflake. This implementation
-      allows for only using your ssh key instead of ever having to use a password and
-      is more secure and convenient.
-    cmds:
-      - task: ssh:gen-ssh-dir
-      - task: ssh:gen-rsa-keys
-        vars:
-          PRIVATE_KEY_FILE_PATH:
-            sh: python3 pyut/util/gen_rsa_key_path.py $CONNECTION_NAME private
-          PUBLIC_KEY_FILE_PATH:
-            sh: python3 pyut/util/gen_rsa_key_path.py $CONNECTION_NAME public
-      - task: cli:add-connection
-        vars:
-          CONNECTION_NAME: $CONNECTION_NAME
-          CONNECTION_ACCOUNT: $CONNECTION_ACCOUNT
-          CONNECTION_USERNAME: $CONNECTION_USERNAME
-          CONNECTION_ROLE: $CONNECTION_ROLE
-          CONNECTION_PRIVATE_KEY_FILE_PATH:
-            sh: python3 pyut/util/gen_rsa_key_path.py $CONNECTION_NAME private
-      - task: rsa:prep-public-key-sql
-        vars:
-          TEMP_DIR: $TEMP_DIR
-          PUBLIC_KEY_FILE_PATH:
-            sh: python3 pyut/util/gen_rsa_key_path.py $CONNECTION_NAME public
-          ASSOCIATE_KEY_WITH_USERNAME: $CONNECTION_USERNAME
-      - task: rsa:add-rsa-key-to-snowflake
-        vars:
-          TEMP_DIR: $TEMP_DIR
-          AUTH_CONNECTION_NAME: $AUTH_CONNECTION_NAME
+          S3_BUCKET_NAME: $S3_BUCKET_NAME
+          AWS_REGION: $AWS_REGION
