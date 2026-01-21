@@ -49,7 +49,7 @@ Your actual environment configuration. This file is git-ignored and contains sen
 |----------|----------|---------|-------------|
 | `AWS_PROFILE` | No | - | AWS profile name (if not set, uses default credential chain) |
 | `AWS_REGION` | **Yes** | us-east-1 | AWS region for S3 and services |
-| `AWS_S3_BUCKET` | No | dgillis-dev | S3 bucket for Iceberg tables |
+| `AWS_S3_BUCKET` | No | shirc-demo | S3 bucket for Iceberg tables |
 | `AWS_S3_FOLDER` | No | snowflake-iceberg | S3 folder/prefix for Iceberg data |
 | `SNOWFLAKE_ACCOUNT` | No | - | Snowflake account identifier |
 | `SNOWFLAKE_WAREHOUSE` | No | COMPUTE_WH | Snowflake warehouse name |
@@ -177,7 +177,7 @@ chmod 644 .env/iceberg.env
 
 ## See Also
 
-- [VALIDATION_GUIDE.md](../VALIDATION_GUIDE.md) - Prerequisites validation documentation
+- [VALIDATION_GUIDE.md](../archive/VALIDATION_GUIDE.md) - Prerequisites validation documentation
 - [AWS_PROFILE_GUIDE.md](../aws/AWS_PROFILE_GUIDE.md) - AWS profile configuration guide
-- [README.md](../README.md) - Main project documentation
+- [README.md](../archive/README.md) - Main project documentation
 - [aws/README.md](../aws/README.md) - AWS scripts documentation

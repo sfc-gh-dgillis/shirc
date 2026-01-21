@@ -1,7 +1,0 @@
-version: '3'
-
-tasks:
-
-  create-user:
-    cmds:
-      - chmod +x ./cmd/create-user.sh && ./cmd/create-user.sh
