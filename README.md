@@ -1,79 +1,368 @@
-# Snowflake Horizon Iceberg REST Catalog (SHIRC)
+# SHIRC - Snowflake Horizon Iceberg REST Catalog
 
-This repository contains tools and automation for testing [Snowflake Horizon Iceberg REST Catalog](https://docs.snowflake.com/en/user-guide/tables-iceberg-rest-catalog).
+> Python script for working with Apache Iceberg tables via Snowflake's Horizon REST catalog
 
-## Prerequisites
+## 📚 Overview
 
-Before getting started, ensure you have the following tools installed:
+This repository provides a Python script demonstrating how to interact with Apache Iceberg tables through Snowflake's Horizon REST catalog (Polaris). The script showcases:
 
-- [Task](https://taskfile.dev/) - Task runner for executing automation tasks
-- [AWS CLI](https://aws.amazon.com/cli/) - For interacting with AWS services
-- [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/installation/installation) - For interacting with Snowflake
-- [uv](https://docs.astral.sh/uv/) - Python package installer
+- Creating and managing Iceberg tables in Snowflake
+- Inserting and updating data
+- Querying with filters
+- Time travel operations using snapshots
+- Schema management
 
-## Getting Started
-
-### Step 1: Validate Prerequisites
-
-Run all prerequisite validation tasks to ensure your environment is properly configured:
+## 🚀 Quick Start
 
 ```bash
-task validate-prerequisites:awscli
-task validate-prerequisites:snowcli
-task validate-prerequisites:uv
-```
-
-These tasks will check:
-
-| Task | Description |
-|------|-------------|
-| `validate-prerequisites:awscli` | Validates AWS CLI is installed and credentials are configured |
-| `validate-prerequisites:snowcli` | Validates Snowflake CLI (snow) is installed |
-| `validate-prerequisites:uv` | Validates uv Python package installer is installed |
-
-If any validation fails, follow the installation instructions provided in the output.
-
-### Step 2: Configure Environment
-
-Copy the environment template and configure your settings:
-
-```bash
+# 1. Set up environment configuration
 cp .env/iceberg.env.template .env/iceberg.env
+# Edit .env/iceberg.env and set your AWS_REGION
+# Optionally set AWS_PROFILE if using named profiles
+
+# 2. Validate prerequisites
+./validate-prerequisites.sh
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Set up Snowflake environment (interactive)
+./setup_snowflake_env.sh
+
+# 5. Run the script
+python blogcode_snowflake_iceberg.py --table customer_data
 ```
 
-Edit `.env/iceberg.env` with your values:
+## 📁 Repository Structure
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `AWS_PROFILE` | AWS CLI profile to use (optional) | `my-profile` |
-| `AWS_REGION` | AWS region for S3 bucket | `us-east-1` |
-| `AWS_S3_BUCKET` | S3 bucket name for Iceberg tables | `my-iceberg-bucket` |
-| `AWS_S3_FOLDER` | Subfolder within the bucket | `snowflake-iceberg` |
+```text
+shirc/
+├── blogcode_snowflake_iceberg.py      # Main Snowflake Iceberg catalog script
+├── requirements.txt                   # Python dependencies
+├── validate-prerequisites.sh          # Prerequisites validation script
+├── check-validation.sh                # Check validation status helper
+├── setup_snowflake_env.sh             # Interactive environment setup
+├── SNOWFLAKE_ICEBERG_GUIDE.md         # Detailed documentation
+├── QUICK_REFERENCE.md                 # Quick reference cheat sheet
+├── VALIDATION_GUIDE.md                # Validation script documentation
+├── AWS_PROFILE_GUIDE.md               # AWS profile configuration guide
+├── AWS_PROFILE_EXAMPLES.md            # AWS profile usage examples
+├── setup.sql                          # SQL setup scripts
+├── .env/                              # Environment configuration
+│   ├── iceberg.env.template           # Configuration template
+│   ├── iceberg.env                    # Your config (git-ignored)
+│   └── README.md                      # Environment config docs
+├── aws/                               # AWS CLI scripts
+│   ├── create_s3_bucket.sh            # S3 bucket creation script
+│   ├── s3_bucket_policy.json          # IAM policy for bucket access
+│   ├── POLICY_README.md               # Policy documentation
+│   └── README.md                      # AWS scripts documentation
+├── tasks/                             # Task definitions and scripts
+│   ├── aws-tasks.yml                  # AWS task definitions
+│   ├── cmd/                           # Command scripts directory
+│   │   └── bucket_s3_create.sh        # S3 bucket creation
+│   ├── .prerequisites_validated       # Validation flag (git-ignored)
+│   └── README.md                      # Tasks documentation
+└── README.md                          # This file
 
-### Step 3: Create S3 Bucket
+Note: The tasks/ directory is tracked. Only .prerequisites_validated is git-ignored
+```
 
-Create an S3 bucket to store your Iceberg tables. This task uses the `AWS_S3_BUCKET` and `AWS_REGION` values from your `iceberg.env` file. Run from the repository root:
+## 🎯 What This Script Does
+
+The script performs the following operations to demonstrate Iceberg features:
+
+1. **Connect** to Snowflake's Horizon Iceberg REST catalog
+2. **List** available databases and tables
+3. **Create** a customer table with schema
+4. **Insert** sample customer data
+5. **Query** data with filters
+6. **Update** customer preference flags
+7. **Time Travel** - query historical snapshots
+8. **Display** formatted output with highlighting
+
+### Sample Output
+
+```shell
+═══════════════════════════════════════════════
+❄️  Initializing Snowflake Iceberg Table Operations
+═══════════════════════════════════════════════
+
+📊 Initial Data - Check preferred_cust_flag value
+══════════════════════════════════════════════════════
+Focus on c_preferred_cust_flag column for changes
+══════════════════════════════════════════════════════
+| c_first_name | c_preferred_cust_flag | ... |
+|--------------|----------------------|-----|
+| Mickey       | ➡️ NULL              | ... |
+
+🔄 Updating customer flag...
+
+📊 Updated Data - Notice the changed preferred_cust_flag
+══════════════════════════════════════════════════════
+| c_first_name | c_preferred_cust_flag | ... |
+|--------------|----------------------|-----|
+| Mickey       | ➡️ N                 | ... |
+
+⏰ Snapshot History:
+[Shows all table snapshots with timestamps]
+```
+
+## 🔧 Configuration
+
+### Environment Variables (Recommended)
+
+Set the following environment variables for authentication:
 
 ```bash
-S3_BUCKET_NAME=$AWS_S3_BUCKET task make-s3-bucket
+export SNOWFLAKE_ACCOUNT='myorg-myaccount'
+export SNOWFLAKE_USER='myuser'
+export SNOWFLAKE_PASSWORD='mypassword'
+export SNOWFLAKE_WAREHOUSE='COMPUTE_WH'
+export SNOWFLAKE_ROLE='ACCOUNTADMIN'  # Optional
 ```
 
-This creates an S3 bucket that will be used as external storage for Snowflake Iceberg tables.
+**Finding Your Account Identifier:**
 
-### Step 4: Generate IAM Policy for S3 Bucket Access
+- Format: `<orgname>-<account_name>` (e.g., `myorg-myaccount`)
+- Or legacy format: `<account_locator>.<region>` (e.g., `xy12345.us-east-1`)
+- Find it in your Snowflake URL: `https://<account_identifier>.snowflakecomputing.com`
 
-Generate an IAM policy document that grants Snowflake access to your S3 bucket. This task uses the `AWS_S3_BUCKET` and `AWS_S3_FOLDER` values from your `iceberg.env` file. Run from the repository root:
+### Interactive Setup
+
+Use the setup script for guided configuration:
 
 ```bash
-S3_BUCKET_NAME=$AWS_S3_BUCKET \
-S3_PREFIX=$AWS_S3_FOLDER \
-TEMPLATE_FILE=tasks/aws-cli/json/template/bucket-policy-template.json \
-OUTPUT_FILE=tasks/aws-cli/json/output/bucket-policy-output.json \
-task generate-iam-policy-for-s3-bucket-access
+./setup_snowflake_env.sh
 ```
 
-The generated policy grants the following permissions:
-- `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`, `s3:DeleteObject`, `s3:DeleteObjectVersion` on objects
-- `s3:ListBucket`, `s3:GetBucketLocation` on the bucket
+This will:
 
-Use this policy to create an IAM role that Snowflake will assume to access your S3 bucket.
+- Prompt for your Snowflake credentials
+- Set environment variables for your session
+- Optionally save to a `.env.snowflake` file
+
+## 📖 Documentation
+
+- **[SNOWFLAKE_ICEBERG_GUIDE.md](SNOWFLAKE_ICEBERG_GUIDE.md)** - Comprehensive guide with detailed examples
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference cheat sheet
+- **[VALIDATION_GUIDE.md](VALIDATION_GUIDE.md)** - Prerequisites validation documentation
+- **[AWS_PROFILE_GUIDE.md](aws/AWS_PROFILE_GUIDE.md)** - AWS profile configuration guide
+- **[AWS_PROFILE_EXAMPLES.md](aws/AWS_PROFILE_EXAMPLES.md)** - AWS profile usage examples
+
+## 🔑 Key Features
+
+### Apache Iceberg Benefits
+
+- ✅ **ACID Transactions** - Reliable concurrent reads and writes
+- ✅ **Time Travel** - Query data as it existed at any point in time
+- ✅ **Schema Evolution** - Add/remove columns without rewriting data
+- ✅ **Hidden Partitioning** - Automatic partition management
+- ✅ **Snapshot Isolation** - Consistent reads without locks
+
+### Script Features
+
+- ✅ **Production-Ready** - Error handling, logging, and validation
+- ✅ **Well-Documented** - Inline comments and docstrings
+- ✅ **Formatted Output** - Tabulated data with highlighting
+- ✅ **Flexible Configuration** - Environment variables and CLI args
+- ✅ **Interactive Setup** - Guided environment configuration
+
+## 🛠️ Dependencies
+
+Install all dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+Or install individually:
+
+```bash
+pip install pyiceberg pyarrow pandas tabulate requests snowflake-connector-python
+```
+
+### Required Packages
+
+- `pyiceberg>=0.5.0` - Python client for Apache Iceberg
+- `pyarrow>=14.0.0` - Columnar data processing
+- `pandas>=2.0.0` - Data manipulation
+- `tabulate>=0.9.0` - Formatted table output
+- `requests>=2.31.0` - HTTP library for REST API
+- `snowflake-connector-python>=3.0.0` - Snowflake connectivity
+
+## 📝 Usage Examples
+
+### Basic Usage
+
+```bash
+python blogcode_snowflake_iceberg.py --table customer_data
+```
+
+### With Custom Database
+
+```bash
+python blogcode_snowflake_iceberg.py \
+  --database my_database \
+  --table my_table
+```
+
+### With Custom Configuration
+
+```bash
+python blogcode_snowflake_iceberg.py \
+  --catalog my_catalog \
+  --database my_db \
+  --table my_table \
+  --warehouse LARGE_WH
+```
+
+### With Command Line Credentials
+
+```bash
+python blogcode_snowflake_iceberg.py \
+  --account myorg-myaccount \
+  --user myuser \
+  --warehouse COMPUTE_WH \
+  --table customer_data
+```
+
+## 🔍 Code Example
+
+### Catalog Initialization
+
+The script uses PyIceberg's `load_catalog()` to connect to Snowflake:
+
+```python
+from pyiceberg.catalog import load_catalog
+
+catalog = load_catalog(
+    "snowflake_iceberg",
+    type="rest",
+    uri=f"https://{account}.snowflakecomputing.com/polaris/api/catalog",
+    warehouse=warehouse,
+    token=oauth_token
+)
+```
+
+### Iceberg Operations
+
+```python
+# List databases
+databases = catalog.list_namespaces()
+
+# List tables
+tables = catalog.list_tables("database_name")
+
+# Load table
+table = catalog.load_table("database.table")
+
+# Insert data
+table.append(data)
+
+# Query with filters
+from pyiceberg.expressions import EqualTo
+data = table.scan(
+    row_filter=EqualTo("field", "value"),
+    limit=10
+).to_pandas()
+
+# Time travel
+snapshots = table.snapshots()
+historical_data = table.scan(
+    snapshot_id=snapshots[1].snapshot_id
+).to_pandas()
+```
+
+## 🧪 Testing
+
+To test the script:
+
+1. **Set up credentials** using environment variables or the setup script
+2. **Run the script** with a test table name
+3. **Verify output** shows all operations completing successfully
+4. **Check Snowflake** to confirm table creation
+
+The script is **idempotent** - safe to run multiple times on the same table.
+
+## 🔒 Security Best Practices
+
+1. **Never commit credentials** to version control
+2. **Use environment variables** for sensitive data
+3. **Add `.env*` files to `.gitignore`** (already configured)
+4. **Rotate passwords regularly**
+5. **Use least-privilege access** (minimal required permissions)
+6. **Enable MFA** on Snowflake accounts
+7. **Use dedicated service accounts** for production
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| **Authentication failed** | Verify account identifier format (should be `orgname-accountname`) |
+| **Warehouse not found** | Check warehouse name and ensure it's running |
+| **Permission denied** | Grant `CREATE TABLE` and `INSERT` privileges to your user |
+| **Module not found** | Run `pip install -r requirements.txt` |
+| **OAuth token error** | Check username/password are correct |
+| **Connection timeout** | Verify network connectivity and Snowflake availability |
+
+### Debug Mode
+
+For detailed error information, check the traceback in the terminal output. The script includes comprehensive error handling and will display helpful error messages.
+
+## 📚 Resources
+
+### Snowflake
+
+- [Snowflake Iceberg Tables Documentation](https://docs.snowflake.com/en/user-guide/tables-iceberg)
+- [Snowflake REST API Documentation](https://docs.snowflake.com/en/developer-guide/rest-api/index)
+
+### Apache Iceberg
+
+- [Apache Iceberg Documentation](https://iceberg.apache.org/)
+- [PyIceberg Documentation](https://py.iceberg.apache.org/)
+- [Iceberg Table Specification](https://iceberg.apache.org/spec/)
+
+### Related Articles
+
+- [Medium Article on Snowflake Iceberg](https://medium.com/snowflake/18adaf6b0bbe)
+
+## 🎓 Learn More
+
+This script demonstrates:
+
+- **REST Catalog Pattern** - Using Snowflake's Polaris REST API
+- **OAuth Authentication** - Token-based authentication flow
+- **PyIceberg Integration** - Working with Iceberg tables in Python
+- **Time Travel Queries** - Leveraging Iceberg's snapshot capabilities
+- **Schema Management** - Defining and using PyArrow schemas
+
+## 🤝 Contributing
+
+Contributions welcome! Areas for enhancement:
+
+- Schema evolution examples
+- Partition management utilities
+- Performance optimization techniques
+- Bulk data operations
+- Integration with Snowpark
+- CI/CD pipeline examples
+
+## 📄 License
+
+This project is provided as-is for educational and demonstration purposes.
+
+## 🙏 Acknowledgments
+
+- Apache Iceberg community for the excellent table format
+- PyIceberg maintainers for the Python implementation
+- Snowflake for Horizon catalog support
+- Medium article that inspired this implementation
+
+---
+
+**Note:** This script demonstrates working with Apache Iceberg tables through Snowflake's Horizon REST catalog (Polaris). It showcases the power of open table formats for modern data architectures.
+
+For detailed usage instructions, see [SNOWFLAKE_ICEBERG_GUIDE.md](SNOWFLAKE_ICEBERG_GUIDE.md).
