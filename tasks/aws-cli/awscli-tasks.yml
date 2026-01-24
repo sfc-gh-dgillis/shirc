@@ -18,12 +18,19 @@ tasks:
       TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "tasks/aws-cli/json/template/bucket-policy-template.json"}}'
       OUTPUT_FILE: '{{.OUTPUT_FILE | default "tasks/aws-cli/json/output/bucket-policy-output.json"}}'
     cmds:
-      - mkdir -p tasks/aws-cli/json/output
       - ./tasks/aws-cli/cmd/generate-iam-policy-for-bucket-access.sh "{{.S3_BUCKET_NAME}}" "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}" "{{.S3_PREFIX}}"
 
   create-iam-policy:
-    desc: Creates an IAM policy from the generated bucket policy JSON file.
-    vars:
-      POLICY_DOCUMENT: '{{.POLICY_DOCUMENT | default "./tasks/aws-cli/json/output/bucket-policy-output.json"}}'
+    desc: Creates an IAM policy from a JSON policy document and saves response to aws-output.json.
     cmds:
-      - aws iam create-policy --policy-name "{{.IAM_POLICY_NAME}}" --policy-document "file://{{.POLICY_DOCUMENT}}"
+      - ./tasks/aws-cli/cmd/create-iam-policy.sh "{{.POLICY_NAME}}" "{{.POLICY_DOCUMENT}}"
+
+  refresh-sso-token:
+    desc: Refreshes the AWS SSO token for the specified profile.
+    cmds:
+      - aws sso login --profile "{{.AWS_PROFILE}}"
+
+  list-profiles:
+    desc: Lists all configured AWS profiles.
+    cmds:
+      - aws configure list-profiles
