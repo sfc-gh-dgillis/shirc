@@ -21,9 +21,11 @@ tasks:
       - ./tasks/aws-cli/cmd/generate-iam-policy-for-bucket-access.sh "{{.S3_BUCKET_NAME}}" "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}" "{{.S3_PREFIX}}"
 
   create-iam-policy:
-    desc: Creates an IAM policy from a JSON policy document and saves response to aws-output.json.
+    desc: Creates an IAM policy from a JSON policy document and saves response to aws-output.json
+    vars:
+      POLICY_DOCUMENT: '{{.POLICY_DOCUMENT | default "tasks/aws-cli/json/output/bucket-policy-output.json"}}'
     cmds:
-      - ./tasks/aws-cli/cmd/create-iam-policy.sh "{{.POLICY_NAME}}" "{{.POLICY_DOCUMENT}}"
+      - ./tasks/aws-cli/cmd/create-iam-policy.sh "{{.IAM_POLICY_NAME}}" "{{.POLICY_DOCUMENT}}"
 
   delete-iam-policy:
     desc: Deletes an IAM policy by ARN.
