@@ -23,7 +23,7 @@ BUCKET_NAME="${BUCKET_NAME#s3://}"
 # Check if bucket exists
 echo "Checking if bucket s3://${BUCKET_NAME} exists..."
 if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
-    echo "⚠️  Warning: Bucket s3://${BUCKET_NAME} does not exist or is not accessible"
+    echo "Warning: Bucket s3://${BUCKET_NAME} does not exist or is not accessible"
     echo "Nothing to delete."
     exit 0
 fi
@@ -38,8 +38,8 @@ aws s3 rb "s3://${BUCKET_NAME}" $FORCE_FLAG
 
 # Check if deletion was successful
 if [ $? -eq 0 ]; then
-    echo "✅ Bucket s3://${BUCKET_NAME} deleted successfully"
+    echo "Bucket s3://${BUCKET_NAME} deleted successfully"
 else
-    echo "❌ Failed to delete bucket"
+    echo "Failed to delete bucket"
     exit 1
 fi
