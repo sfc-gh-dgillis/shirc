@@ -12,31 +12,6 @@ dotenv: ['{{ .ENV_DIR }}/{{ .DOTENV_FILENAME | default "iceberg.env" }}']
 
 tasks:
 
-  make-s3-bucket:
-    desc: Create an S3 bucket using AWS CLI.
-    cmds:
-      - task: aws-cli:make-s3-bucket
-        vars:
-          S3_BUCKET_NAME: $S3_BUCKET_NAME
-          AWS_REGION: $AWS_REGION
-
-  generate-iam-policy:
-    desc: Generate an IAM/S3 policy for accessing the given bucket.
-    cmds:
-      - task: aws-cli:generate-iam-policy-for-s3-bucket-access
-        vars:
-          S3_BUCKET_NAME: $S3_BUCKET_NAME
-          S3_PREFIX: $S3_PREFIX
-
-  create-iam-policy:
-    desc: |
-      Create an IAM policy from the generated bucket policy JSON file. The POLICY_DOCUMENT
-      is deliberately not set here to use the default value defined in the aws-cli task.
-    cmds:
-      - task: aws-cli:create-iam-policy
-        vars:
-          IAM_POLICY_NAME: $IAM_POLICY_NAME
-
   aws-resources-up:
     desc: Validates AWS CLI, creates S3 bucket, generates and creates IAM policy.
     cmds:

@@ -32,6 +32,26 @@ tasks:
     cmds:
       - ./tasks/aws-cli/cmd/delete-iam-policy.sh
 
+  generate-trust-policy:
+    desc: Generates a trust policy document from a template using AWS account ID and external ID.
+    vars:
+      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "tasks/aws-cli/json/template/trust-policy-template.json"}}'
+      OUTPUT_FILE: '{{.OUTPUT_FILE | default "tasks/aws-cli/json/output/trust-policy-output.json"}}'
+    cmds:
+      - ./tasks/aws-cli/cmd/generate-trust-policy.sh "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}"
+
+  create-iam-role:
+    desc: Creates an IAM role with an external ID for cross-account access.
+    vars:
+      TRUST_POLICY_DOCUMENT: '{{.TRUST_POLICY_DOCUMENT | default "tasks/aws-cli/json/output/trust-policy-output.json"}}'
+    cmds:
+      - ./tasks/aws-cli/cmd/create-iam-role.sh "{{.IAM_ROLE_NAME}}" "{{.TRUST_POLICY_DOCUMENT}}"
+
+  attach-policy-to-role:
+    desc: Attaches the IAM policy to the IAM role (reads ARNs from aws-output.json).
+    cmds:
+      - ./tasks/aws-cli/cmd/attach-policy-to-role.sh
+
   refresh-sso-token:
     desc: Refreshes the AWS SSO token for the specified profile.
     cmds:
