@@ -1,368 +1,355 @@
 # SHIRC - Snowflake Horizon Iceberg REST Catalog
 
-> Python script for working with Apache Iceberg tables via Snowflake's Horizon REST catalog
+> Automated setup and management of AWS and Snowflake resources for Apache Iceberg tables
 
 ## 📚 Overview
 
-This repository provides a Python script demonstrating how to interact with Apache Iceberg tables through Snowflake's Horizon REST catalog (Polaris). The script showcases:
+SHIRC provides automated infrastructure setup for working with Apache Iceberg tables through Snowflake's Horizon REST catalog. Using Task automation, it handles:
 
-- Creating and managing Iceberg tables in Snowflake
-- Inserting and updating data
-- Querying with filters
-- Time travel operations using snapshots
-- Schema management
+- **AWS Resources**: S3 buckets, IAM policies, and roles with trust relationships
+- **Snowflake Resources**: External volumes configured for Iceberg storage
+- **Integration**: Automatic trust policy updates to connect AWS and Snowflake
 
 ## 🚀 Quick Start
 
+### One-Command Setup
+
 ```bash
-# 1. Set up environment configuration
+# 1. Configure environment
 cp .env/iceberg.env.template .env/iceberg.env
-# Edit .env/iceberg.env and set your AWS_REGION
-# Optionally set AWS_PROFILE if using named profiles
+# Edit .env/iceberg.env with your values
 
-# 2. Validate prerequisites
-./validate-prerequisites.sh
+# 2. Set up everything
+task demo-up
+```
 
-# 3. Install dependencies
-pip install -r requirements.txt
+That's it! This single command will:
 
-# 4. Set up Snowflake environment (interactive)
-./setup_snowflake_env.sh
+- ✅ Create S3 bucket for Iceberg data
+- ✅ Create IAM policy for bucket access
+- ✅ Create IAM role with trust policy
+- ✅ Create Snowflake external volume
+- ✅ Update trust policy with Snowflake's IAM user
 
-# 5. Run the script
-python blogcode_snowflake_iceberg.py --table customer_data
+### Teardown
+
+```bash
+# Clean up all resources
+task demo-teardown
+```
+
+## 📋 Prerequisites
+
+- [Task](https://taskfile.dev/) - Task runner (install: `brew install go-task`)
+- [AWS CLI](https://aws.amazon.com/cli/) - AWS command line interface
+- [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) - Snowflake command line interface
+- [jq](https://stedolan.github.io/jq/) - JSON processor (install: `brew install jq`)
+- AWS credentials configured
+- Snowflake credentials configured
+
+### Validate Prerequisites
+
+```bash
+task validate-prerequisites:awscli
+task validate-prerequisites:snowcli
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Edit `.env/iceberg.env`:
+
+```bash
+# AWS Configuration
+AWS_REGION=us-east-1
+S3_BUCKET_NAME=your-bucket-name
+S3_PREFIX=snowflake-iceberg
+IAM_POLICY_NAME=YourIcebergAccessPolicy
+IAM_ROLE_NAME=YourIcebergAccessRole
+TRUST_POLICY_EXTERNAL_ID=your-external-id
+
+# Snowflake Configuration
+EXTERNAL_VOLUME_NAME=iceberg_ext_vol
+```
+
+## 🎯 Available Tasks
+
+### Main Tasks
+
+| Task                 | Description                                             |
+|----------------------|---------------------------------------------------------|
+| `task demo-up`       | Complete setup: AWS + Snowflake + integration           |
+| `task demo-teardown` | Complete teardown: remove all resources                 |
+
+### AWS Resource Tasks
+
+| Task                                                   | Description                                                      |
+|--------------------------------------------------------|------------------------------------------------------------------|
+| `task aws-resources-up`                                | Create S3 bucket, IAM policy, and role                           |
+| `task aws-resources-teardown`                          | Delete IAM role, policy, and S3 bucket                           |
+| `task aws-cli:make-s3-bucket`                          | Create S3 bucket only                                            |
+| `task aws-cli:delete-s3-bucket`                        | Delete S3 bucket (use FORCE=--force to delete with contents)     |
+| `task aws-cli:create-iam-policy`                       | Create IAM policy for S3 access                                  |
+| `task aws-cli:delete-iam-policy`                       | Delete IAM policy                                                |
+| `task aws-cli:create-iam-role`                         | Create IAM role with trust policy                                |
+| `task aws-cli:delete-iam-role`                         | Delete IAM role                                                  |
+| `task aws-cli:attach-policy-to-role`                   | Attach policy to role                                            |
+| `task aws-cli:detach-policy-from-role`                 | Detach policy from role                                          |
+| `task aws-cli:update-trust-policy-with-snowflake-user` | Update trust policy with Snowflake IAM user                      |
+
+### Snowflake Resource Tasks
+
+| Task                                   | Description                              |
+|----------------------------------------|------------------------------------------|
+| `task snowflake-resources-up`          | Create and describe external volume      |
+| `task snowflake-resources-teardown`    | Drop external volume                     |
+| `task snow-cli:create-external-volume` | Create external volume only              |
+| `task snow-cli:drop-external-volume`   | Drop external volume only                |
+| `task snow-cli:desc-external-volume`   | Describe external volume and save JSON   |
+
+## 🏗️ Architecture
+
+### What Gets Created
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                         AWS Account                         │
+│                                                             │
+│  ┌─────────────────────┐      ┌────────────────────────┐  │
+│  │   S3 Bucket         │      │   IAM Role             │  │
+│  │   your-bucket       │◄─────┤   YourIcebergRole      │  │
+│  │   └─ iceberg/       │      │   (Trust Policy)       │  │
+│  └─────────────────────┘      └────────────────────────┘  │
+│                                          ▲                  │
+│                                          │                  │
+│  ┌─────────────────────────────────────┐│                  │
+│  │   IAM Policy                        ││                  │
+│  │   YourIcebergAccessPolicy           ││                  │
+│  │   (S3 permissions)                  ││                  │
+│  └─────────────────────────────────────┘│                  │
+│                                          │                  │
+└──────────────────────────────────────────┼──────────────────┘
+                                           │
+                                           │ AssumeRole
+                                           │
+┌──────────────────────────────────────────┼──────────────────┐
+│                    Snowflake             │                  │
+│                                          │                  │
+│  ┌──────────────────────────────────────▼──────────────┐  │
+│  │   External Volume: iceberg_ext_vol                   │  │
+│  │   - Storage: s3://your-bucket/iceberg/               │  │
+│  │   - Role ARN: arn:aws:iam::xxx:role/YourRole         │  │
+│  │   - External ID: your-external-id                    │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 📖 Usage Examples
+
+### Complete Setup and Teardown
+
+```bash
+# Set up everything
+task demo-up
+
+# Use your Iceberg tables in Snowflake
+# (create tables, insert data, query, etc.)
+
+# Clean up everything
+task demo-teardown
+```
+
+### Step-by-Step Setup
+
+```bash
+# 1. Create AWS resources
+task aws-resources-up
+
+# 2. Create Snowflake resources
+task snowflake-resources-up
+
+# 3. Update trust policy with Snowflake's IAM user
+task aws-cli:update-trust-policy-with-snowflake-user
+```
+
+### Individual Operations
+
+```bash
+# Just create an S3 bucket
+task aws-cli:make-s3-bucket S3_BUCKET_NAME=my-bucket AWS_REGION=us-west-2
+
+# Delete S3 bucket (force delete with contents)
+task aws-cli:delete-s3-bucket S3_BUCKET_NAME=my-bucket FORCE=--force
+
+# Describe existing external volume
+task snow-cli:desc-external-volume EXTERNAL_VOLUME_NAME=my_ext_vol
 ```
 
 ## 📁 Repository Structure
 
 ```text
 shirc/
-├── blogcode_snowflake_iceberg.py      # Main Snowflake Iceberg catalog script
-├── requirements.txt                   # Python dependencies
-├── validate-prerequisites.sh          # Prerequisites validation script
-├── check-validation.sh                # Check validation status helper
-├── setup_snowflake_env.sh             # Interactive environment setup
-├── SNOWFLAKE_ICEBERG_GUIDE.md         # Detailed documentation
-├── QUICK_REFERENCE.md                 # Quick reference cheat sheet
-├── VALIDATION_GUIDE.md                # Validation script documentation
-├── AWS_PROFILE_GUIDE.md               # AWS profile configuration guide
-├── AWS_PROFILE_EXAMPLES.md            # AWS profile usage examples
-├── setup.sql                          # SQL setup scripts
-├── .env/                              # Environment configuration
-│   ├── iceberg.env.template           # Configuration template
-│   ├── iceberg.env                    # Your config (git-ignored)
-│   └── README.md                      # Environment config docs
-├── aws/                               # AWS CLI scripts
-│   ├── create_s3_bucket.sh            # S3 bucket creation script
-│   ├── s3_bucket_policy.json          # IAM policy for bucket access
-│   ├── POLICY_README.md               # Policy documentation
-│   └── README.md                      # AWS scripts documentation
-├── tasks/                             # Task definitions and scripts
-│   ├── aws-tasks.yml                  # AWS task definitions
-│   ├── cmd/                           # Command scripts directory
-│   │   └── bucket_s3_create.sh        # S3 bucket creation
-│   ├── .prerequisites_validated       # Validation flag (git-ignored)
-│   └── README.md                      # Tasks documentation
-└── README.md                          # This file
-
-Note: The tasks/ directory is tracked. Only .prerequisites_validated is git-ignored
+├── Taskfile.yml                      # Main task definitions
+├── .env/
+│   ├── iceberg.env.template          # Configuration template
+│   └── iceberg.env                   # Your config (git-ignored)
+├── tasks/
+│   ├── aws-cli/
+│   │   ├── awscli-tasks.yml          # AWS CLI task definitions
+│   │   ├── cmd/                      # AWS CLI scripts
+│   │   │   ├── make-bucket.sh
+│   │   │   ├── delete-bucket.sh
+│   │   │   ├── create-iam-policy.sh
+│   │   │   ├── delete-iam-policy.sh
+│   │   │   ├── create-iam-role.sh
+│   │   │   ├── delete-iam-role.sh
+│   │   │   ├── attach-policy-to-role.sh
+│   │   │   ├── detach-policy-from-role.sh
+│   │   │   ├── generate-iam-policy-for-bucket-access.sh
+│   │   │   ├── generate-trust-policy.sh
+│   │   │   └── update-trust-policy-with-snowflake-user.sh
+│   │   └── json/
+│   │       ├── template/             # JSON templates
+│   │       ├── output/               # Generated policies
+│   │       └── aws-output.json       # AWS resource metadata
+│   ├── snow-cli/
+│   │   ├── snow-cli-tasks.yml        # Snowflake CLI task definitions
+│   │   ├── cmd/                      # Snowflake CLI scripts
+│   │   │   ├── create-external-volume.sh
+│   │   │   ├── drop-external-volume.sh
+│   │   │   └── desc-external-volume.sh
+│   │   ├── batch-0/                  # SQL templates
+│   │   │   ├── create_external_volume.sql
+│   │   │   ├── drop_external_volume.sql
+│   │   │   └── desc_external_volume.sql
+│   │   └── json/                     # Snowflake outputs
+│   │       ├── external-volume-desc.json
+│   │       └── external-volume-desc-storage-location.json
+│   └── validate-prerequisites/
+│       └── validate-prerequisite-tasks.yml
+└── README.md                         # This file
 ```
 
-## 🎯 What This Script Does
+## 🔧 How It Works
 
-The script performs the following operations to demonstrate Iceberg features:
+### AWS Resources Setup
 
-1. **Connect** to Snowflake's Horizon Iceberg REST catalog
-2. **List** available databases and tables
-3. **Create** a customer table with schema
-4. **Insert** sample customer data
-5. **Query** data with filters
-6. **Update** customer preference flags
-7. **Time Travel** - query historical snapshots
-8. **Display** formatted output with highlighting
+1. **S3 Bucket**: Created in your specified region with the configured prefix
+2. **IAM Policy**: Generated from template with S3 permissions (ListBucket, GetObject, PutObject, DeleteObject)
+3. **IAM Role**: Created with initial trust policy (trusts your AWS account)
+4. **Policy Attachment**: IAM policy attached to the role
 
-### Sample Output
+### Snowflake Integration
 
-```shell
-═══════════════════════════════════════════════
-❄️  Initializing Snowflake Iceberg Table Operations
-═══════════════════════════════════════════════
+1. **External Volume**: Created in Snowflake pointing to your S3 bucket
+2. **Description**: External volume details retrieved including Snowflake's IAM user ARN
+3. **Trust Policy Update**: AWS role trust policy updated to allow Snowflake's IAM user to assume the role
 
-📊 Initial Data - Check preferred_cust_flag value
-══════════════════════════════════════════════════════
-Focus on c_preferred_cust_flag column for changes
-══════════════════════════════════════════════════════
-| c_first_name | c_preferred_cust_flag | ... |
-|--------------|----------------------|-----|
-| Mickey       | ➡️ NULL              | ... |
+### Resource Metadata
 
-🔄 Updating customer flag...
+All resource details are stored in JSON files:
 
-📊 Updated Data - Notice the changed preferred_cust_flag
-══════════════════════════════════════════════════════
-| c_first_name | c_preferred_cust_flag | ... |
-|--------------|----------------------|-----|
-| Mickey       | ➡️ N                 | ... |
-
-⏰ Snapshot History:
-[Shows all table snapshots with timestamps]
-```
-
-## 🔧 Configuration
-
-### Environment Variables (Recommended)
-
-Set the following environment variables for authentication:
-
-```bash
-export SNOWFLAKE_ACCOUNT='myorg-myaccount'
-export SNOWFLAKE_USER='myuser'
-export SNOWFLAKE_PASSWORD='mypassword'
-export SNOWFLAKE_WAREHOUSE='COMPUTE_WH'
-export SNOWFLAKE_ROLE='ACCOUNTADMIN'  # Optional
-```
-
-**Finding Your Account Identifier:**
-
-- Format: `<orgname>-<account_name>` (e.g., `myorg-myaccount`)
-- Or legacy format: `<account_locator>.<region>` (e.g., `xy12345.us-east-1`)
-- Find it in your Snowflake URL: `https://<account_identifier>.snowflakecomputing.com`
-
-### Interactive Setup
-
-Use the setup script for guided configuration:
-
-```bash
-./setup_snowflake_env.sh
-```
-
-This will:
-
-- Prompt for your Snowflake credentials
-- Set environment variables for your session
-- Optionally save to a `.env.snowflake` file
-
-## 📖 Documentation
-
-- **[SNOWFLAKE_ICEBERG_GUIDE.md](SNOWFLAKE_ICEBERG_GUIDE.md)** - Comprehensive guide with detailed examples
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference cheat sheet
-- **[VALIDATION_GUIDE.md](VALIDATION_GUIDE.md)** - Prerequisites validation documentation
-- **[AWS_PROFILE_GUIDE.md](aws/AWS_PROFILE_GUIDE.md)** - AWS profile configuration guide
-- **[AWS_PROFILE_EXAMPLES.md](aws/AWS_PROFILE_EXAMPLES.md)** - AWS profile usage examples
-
-## 🔑 Key Features
-
-### Apache Iceberg Benefits
-
-- ✅ **ACID Transactions** - Reliable concurrent reads and writes
-- ✅ **Time Travel** - Query data as it existed at any point in time
-- ✅ **Schema Evolution** - Add/remove columns without rewriting data
-- ✅ **Hidden Partitioning** - Automatic partition management
-- ✅ **Snapshot Isolation** - Consistent reads without locks
-
-### Script Features
-
-- ✅ **Production-Ready** - Error handling, logging, and validation
-- ✅ **Well-Documented** - Inline comments and docstrings
-- ✅ **Formatted Output** - Tabulated data with highlighting
-- ✅ **Flexible Configuration** - Environment variables and CLI args
-- ✅ **Interactive Setup** - Guided environment configuration
-
-## 🛠️ Dependencies
-
-Install all dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
-
-Or install individually:
-
-```bash
-pip install pyiceberg pyarrow pandas tabulate requests snowflake-connector-python
-```
-
-### Required Packages
-
-- `pyiceberg>=0.5.0` - Python client for Apache Iceberg
-- `pyarrow>=14.0.0` - Columnar data processing
-- `pandas>=2.0.0` - Data manipulation
-- `tabulate>=0.9.0` - Formatted table output
-- `requests>=2.31.0` - HTTP library for REST API
-- `snowflake-connector-python>=3.0.0` - Snowflake connectivity
-
-## 📝 Usage Examples
-
-### Basic Usage
-
-```bash
-python blogcode_snowflake_iceberg.py --table customer_data
-```
-
-### With Custom Database
-
-```bash
-python blogcode_snowflake_iceberg.py \
-  --database my_database \
-  --table my_table
-```
-
-### With Custom Configuration
-
-```bash
-python blogcode_snowflake_iceberg.py \
-  --catalog my_catalog \
-  --database my_db \
-  --table my_table \
-  --warehouse LARGE_WH
-```
-
-### With Command Line Credentials
-
-```bash
-python blogcode_snowflake_iceberg.py \
-  --account myorg-myaccount \
-  --user myuser \
-  --warehouse COMPUTE_WH \
-  --table customer_data
-```
-
-## 🔍 Code Example
-
-### Catalog Initialization
-
-The script uses PyIceberg's `load_catalog()` to connect to Snowflake:
-
-```python
-from pyiceberg.catalog import load_catalog
-
-catalog = load_catalog(
-    "snowflake_iceberg",
-    type="rest",
-    uri=f"https://{account}.snowflakecomputing.com/polaris/api/catalog",
-    warehouse=warehouse,
-    token=oauth_token
-)
-```
-
-### Iceberg Operations
-
-```python
-# List databases
-databases = catalog.list_namespaces()
-
-# List tables
-tables = catalog.list_tables("database_name")
-
-# Load table
-table = catalog.load_table("database.table")
-
-# Insert data
-table.append(data)
-
-# Query with filters
-from pyiceberg.expressions import EqualTo
-data = table.scan(
-    row_filter=EqualTo("field", "value"),
-    limit=10
-).to_pandas()
-
-# Time travel
-snapshots = table.snapshots()
-historical_data = table.scan(
-    snapshot_id=snapshots[1].snapshot_id
-).to_pandas()
-```
-
-## 🧪 Testing
-
-To test the script:
-
-1. **Set up credentials** using environment variables or the setup script
-2. **Run the script** with a test table name
-3. **Verify output** shows all operations completing successfully
-4. **Check Snowflake** to confirm table creation
-
-The script is **idempotent** - safe to run multiple times on the same table.
+- `tasks/aws-cli/json/aws-output.json` - AWS resource ARNs and metadata
+- `tasks/snow-cli/json/external-volume-desc.json` - Full external volume description
+- `tasks/snow-cli/json/external-volume-desc-storage-location.json` - Storage location details
 
 ## 🔒 Security Best Practices
 
 1. **Never commit credentials** to version control
-2. **Use environment variables** for sensitive data
-3. **Add `.env*` files to `.gitignore`** (already configured)
-4. **Rotate passwords regularly**
-5. **Use least-privilege access** (minimal required permissions)
-6. **Enable MFA** on Snowflake accounts
-7. **Use dedicated service accounts** for production
+2. **Use `.env` files** for configuration (already git-ignored)
+3. **Rotate external IDs** regularly
+4. **Use least-privilege IAM policies**
+5. **Enable MFA** on AWS and Snowflake accounts
+6. **Review trust policies** before deployment
+7. **Use separate environments** for dev/staging/prod
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| **Authentication failed** | Verify account identifier format (should be `orgname-accountname`) |
-| **Warehouse not found** | Check warehouse name and ensure it's running |
-| **Permission denied** | Grant `CREATE TABLE` and `INSERT` privileges to your user |
-| **Module not found** | Run `pip install -r requirements.txt` |
-| **OAuth token error** | Check username/password are correct |
-| **Connection timeout** | Verify network connectivity and Snowflake availability |
+| Issue                              | Solution                                      |
+|------------------------------------|-----------------------------------------------|
+| **Task not found**                 | Install Task: `brew install go-task`          |
+| **AWS CLI not configured**         | Run `aws configure` or set AWS_PROFILE        |
+| **Snowflake CLI not configured**   | Run `snow connection add`                     |
+| **Permission denied (S3)**         | Check AWS credentials and IAM permissions     |
+| **External volume creation fails** | Verify S3 bucket and IAM role exist           |
+| **Trust policy update fails**      | Ensure external volume is created first       |
+| **jq command not found**           | Install jq: `brew install jq`                 |
 
 ### Debug Mode
 
-For detailed error information, check the traceback in the terminal output. The script includes comprehensive error handling and will display helpful error messages.
+View detailed output by checking the script execution:
+
+```bash
+# View AWS output
+cat tasks/aws-cli/json/aws-output.json | jq '.'
+
+# View Snowflake external volume details
+cat tasks/snow-cli/json/external-volume-desc-storage-location.json | jq '.'
+```
 
 ## 📚 Resources
 
-### Snowflake
+### Documentation
 
-- [Snowflake Iceberg Tables Documentation](https://docs.snowflake.com/en/user-guide/tables-iceberg)
-- [Snowflake REST API Documentation](https://docs.snowflake.com/en/developer-guide/rest-api/index)
+- [Apache Iceberg](https://iceberg.apache.org/) - Open table format specification
+- [Snowflake Iceberg Tables](https://docs.snowflake.com/en/user-guide/tables-iceberg) - Snowflake Iceberg documentation
+- [Task Documentation](https://taskfile.dev/) - Task runner documentation
+- [AWS CLI Reference](https://docs.aws.amazon.com/cli/) - AWS CLI documentation
+- [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) - Snowflake CLI documentation
 
-### Apache Iceberg
+### Related Projects
 
-- [Apache Iceberg Documentation](https://iceberg.apache.org/)
-- [PyIceberg Documentation](https://py.iceberg.apache.org/)
-- [Iceberg Table Specification](https://iceberg.apache.org/spec/)
+- [PyIceberg](https://py.iceberg.apache.org/) - Python client for Apache Iceberg
+- [Apache Iceberg REST Catalog](https://iceberg.apache.org/docs/latest/rest/) - REST catalog specification
 
-### Related Articles
+## 🎓 What You Get
 
-- [Medium Article on Snowflake Iceberg](https://medium.com/snowflake/18adaf6b0bbe)
+After running `task demo-up`, you'll have:
 
-## 🎓 Learn More
+- ✅ S3 bucket ready for Iceberg data storage
+- ✅ IAM role with proper permissions and trust policy
+- ✅ Snowflake external volume configured and integrated
+- ✅ All resource metadata saved in JSON files
+- ✅ Full integration between AWS and Snowflake
 
-This script demonstrates:
+You can then create Iceberg tables in Snowflake:
 
-- **REST Catalog Pattern** - Using Snowflake's Polaris REST API
-- **OAuth Authentication** - Token-based authentication flow
-- **PyIceberg Integration** - Working with Iceberg tables in Python
-- **Time Travel Queries** - Leveraging Iceberg's snapshot capabilities
-- **Schema Management** - Defining and using PyArrow schemas
+```sql
+-- Create an Iceberg table using your external volume
+CREATE ICEBERG TABLE my_iceberg_table (
+  id INT,
+  name STRING,
+  created_at TIMESTAMP
+)
+CATALOG = 'SNOWFLAKE'
+EXTERNAL_VOLUME = 'iceberg_ext_vol'
+BASE_LOCATION = 'my_table';
+
+-- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'test', CURRENT_TIMESTAMP());
+
+-- Query data
+SELECT * FROM my_iceberg_table;
+```
 
 ## 🤝 Contributing
 
 Contributions welcome! Areas for enhancement:
 
-- Schema evolution examples
-- Partition management utilities
-- Performance optimization techniques
-- Bulk data operations
-- Integration with Snowpark
-- CI/CD pipeline examples
+- Additional Snowflake resource types (catalogs, schemas)
+- Support for multiple external volumes
+- Automated testing scripts
+- CI/CD pipeline integration
+- Terraform/CloudFormation alternatives
 
 ## 📄 License
 
 This project is provided as-is for educational and demonstration purposes.
 
-## 🙏 Acknowledgments
-
-- Apache Iceberg community for the excellent table format
-- PyIceberg maintainers for the Python implementation
-- Snowflake for Horizon catalog support
-- Medium article that inspired this implementation
-
 ---
 
-**Note:** This script demonstrates working with Apache Iceberg tables through Snowflake's Horizon REST catalog (Polaris). It showcases the power of open table formats for modern data architectures.
-
-For detailed usage instructions, see [SNOWFLAKE_ICEBERG_GUIDE.md](SNOWFLAKE_ICEBERG_GUIDE.md).
+**Note:** This project automates the setup of AWS and Snowflake resources for Apache Iceberg table integration. It demonstrates infrastructure-as-code principles using Task automation and shell scripting.
