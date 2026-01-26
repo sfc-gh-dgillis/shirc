@@ -5,21 +5,21 @@ tasks:
   create-external-volume:
     desc: Creates a Snowflake external volume using the Snow CLI with Jinja templating.
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "tasks/snow-cli/batch-0/create_external_volume.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "tasks/snow-cli/sql/batch-0/create_external_volume.sql"}}'
     cmds:
       - ./tasks/snow-cli/cmd/create-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}"
 
   drop-external-volume:
     desc: Drops a Snowflake external volume using the Snow CLI with Jinja templating.
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "tasks/snow-cli/batch-0/drop_external_volume.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "tasks/snow-cli/sql/batch-0/drop_external_volume.sql"}}'
     cmds:
       - ./tasks/snow-cli/cmd/drop-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}"
 
   desc-external-volume:
     desc: Describes a Snowflake external volume and outputs JSON to a file.
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "tasks/snow-cli/batch-0/desc_external_volume.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "tasks/snow-cli/sql/batch-0/desc_external_volume.sql"}}'
       OUTPUT_FILE: '{{.OUTPUT_FILE | default "tasks/snow-cli/json/external-volume-desc.json"}}'
     cmds:
       - ./tasks/snow-cli/cmd/desc-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}" "{{.OUTPUT_FILE}}"
