@@ -3,7 +3,9 @@ version: '3'
 includes:
   validate-prerequisites: ./tasks/validate-prerequisites/validate-prerequisite-tasks.yml
   aws-cli: ./tasks/aws-cli/awscli-tasks.yml
-  snow-cli: ./tasks/snow-cli/snow-cli-tasks.yml
+  snow-cli:
+    taskfile: ./tasks/snow-cli/snowcli-tasks.yml
+    dir: ./tasks/snow-cli
 
 env:
   ENV_DIR: .env
@@ -62,6 +64,10 @@ tasks:
     desc: Drops the Snowflake external volume.
     cmds:
       - task: validate-prerequisites:snowcli
+      - task: snow-cli:drop-database-if-exists
+        vars:
+          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
+          DATABASE_NAME: $DATABASE_NAME
       - task: snow-cli:drop-external-volume
         vars:
           EXTERNAL_VOLUME_NAME: $EXTERNAL_VOLUME_NAME
@@ -72,6 +78,10 @@ tasks:
       - task: aws-resources-up
       - task: snowflake-resources-up
       - task: aws-cli:update-trust-policy-with-snowflake-user
+      - task: snow-cli:run-init
+      - task: snow-cli:upload-files-to-internal-named-stage
+        vars:
+          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
 
   demo-teardown:
     desc: Tears down AWS and Snowflake resources for Iceberg demo.
