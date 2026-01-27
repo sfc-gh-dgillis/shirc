@@ -18,7 +18,7 @@ if [ ! -f "$SQL_FILE" ]; then
 fi
 
 # Path to the JSON output file
-JSON_FILE="tasks/aws-cli/json/aws-output.json"
+JSON_FILE="../../tasks/aws-cli/json/aws-output.json"
 
 # Check if JSON file exists
 if [ ! -f "$JSON_FILE" ]; then
