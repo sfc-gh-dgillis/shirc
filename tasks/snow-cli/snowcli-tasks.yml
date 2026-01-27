@@ -1,0 +1,45 @@
+version: '3'
+
+tasks:
+
+  create-external-volume:
+    desc: Creates a Snowflake external volume using the Snow CLI with Jinja templating.
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-0/create_external_volume.sql"}}'
+    cmds:
+      - cmd/create-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}"
+
+  drop-external-volume:
+    desc: Drops a Snowflake external volume using the Snow CLI with Jinja templating.
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-0/drop_external_volume.sql"}}'
+    cmds:
+      - cmd/drop-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}"
+
+  desc-external-volume:
+    desc: Describes a Snowflake external volume and outputs JSON to a file.
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-0/desc_external_volume.sql"}}'
+      OUTPUT_FILE: '{{.OUTPUT_FILE | default "tasks/snow-cli/json/external-volume-desc.json"}}'
+    cmds:
+      - cmd/desc-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}" "{{.OUTPUT_FILE}}"
+
+  run-init:
+    desc: Runs Snowflake initialization script (001-init.sql) with Jinja templating.
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-1/001-init.sql"}}'
+    cmds:
+      - cmd/run-init.sh "{{.SQL_FILE}}"
+
+  upload-files-to-internal-named-stage:
+    desc: Uploads all files from the given directory to a Snowflake Internal stage using the Snowflake CLI and PUT command.
+    vars:
+      FILE_UPLOAD_DIR: '{{.FILE_UPLOAD_DIR | default "../../upload"}}'
+      INTERNAL_NAMED_STAGE: '{{.INTERNAL_NAMED_STAGE | default "@json_stage"}}'
+    cmds:
+      - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
+
+  drop-database-if-exists:
+    desc: Drops the specified Snowflake database if it exists using the Snowflake CLI.
+    cmds:
+      - snow sql --connection "{{.CLI_CONNECTION_NAME}}" --query "DROP DATABASE IF EXISTS {{.DEMO_DATABASE_NAME}};"
