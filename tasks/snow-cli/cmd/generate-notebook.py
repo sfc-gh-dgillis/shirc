@@ -6,7 +6,7 @@ Usage:
     python3 generate-notebook.py --template <template.ipynb> --output <output.ipynb>
 
 Environment variables used for substitution:
-    - WAREHOUSE_NAME
+    - DEMO_WAREHOUSE_NAME
     - DEMO_ENGINEER_ROLE_NAME
     - DEMO_DATABASE_NAME
     - EXTERNAL_VOLUME_NAME
@@ -78,7 +78,7 @@ def main():
 
     # Get variables from environment
     variables = {
-        "warehouse_name": get_required_env("WAREHOUSE_NAME"),
+        "demo_warehouse_name": get_required_env("DEMO_WAREHOUSE_NAME"),
         "demo_engineer_role_name": get_required_env("DEMO_ENGINEER_ROLE_NAME"),
         "demo_database_name": get_required_env("DEMO_DATABASE_NAME"),
         "external_volume_name": get_required_env("EXTERNAL_VOLUME_NAME"),
@@ -88,7 +88,7 @@ def main():
     print("Generating notebook from template...")
     print(f"  Template: {template_path}")
     print(f"  Output: {output_path}")
-    print(f"  Warehouse: {variables['warehouse_name']}")
+    print(f"  Warehouse: {variables['demo_warehouse_name']}")
     print(f"  Role: {variables['demo_engineer_role_name']}")
     print(f"  Database: {variables['demo_database_name']}")
     print(f"  External Volume: {variables['external_volume_name']}")
