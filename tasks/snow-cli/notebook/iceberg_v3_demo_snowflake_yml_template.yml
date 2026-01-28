@@ -8,6 +8,6 @@ entities:
       database: {{ demo_database_name }}
       schema: {{ demo_schema_name }}
     stage_path: {{ internal_named_stage }}
-    notebook_file: {{ notebook_file }}
+    notebook_file: {{ notebook_file_path }}
     artifacts:
     - {{ notebook_file }}

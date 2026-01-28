@@ -120,6 +120,7 @@ def main():
         snowflake_yml_output = output_path.parent / "snowflake.yml"
         yml_variables = variables.copy()
         yml_variables["notebook_file"] = output_path.name
+        yml_variables["notebook_file_path"] = str(output_path)
         generate_snowflake_yml(snowflake_yml_template, snowflake_yml_output, yml_variables)
     else:
         print(f"Warning: snowflake.yml template not found at {snowflake_yml_template}")
