@@ -55,6 +55,6 @@ tasks:
   deploy-notebook:
     desc: Deploys a notebook to Snowflake using the Snow CLI.
     vars:
-      NOTEBOOK_FILE: '{{.PROJECT_DIR | default "notebook/iceberg_v3_notebook"}}'
+      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/iceberg_v3_notebook"}}'
     cmds:
       - cmd/deploy-notebook.sh "{{.PROJECT_DIR}}"
