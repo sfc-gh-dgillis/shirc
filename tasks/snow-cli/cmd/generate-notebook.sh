@@ -6,7 +6,7 @@ set -euo pipefail
 
 if [ $# -lt 2 ]; then
     echo "Usage: $0 TEMPLATE_FILE OUTPUT_FILE"
-    echo "Example: $0 notebook/snowflake_iceberg_v3_template.ipynb ../../output/snowflake_iceberg_v3_demo_notebook.ipynb"
+    echo "Example: $0 notebook/iceberg_v3_template.ipynb notebook/v3_iceberg_demo/iceberg_v3_demo_notebook.ipynb"
     exit 1
 fi
 

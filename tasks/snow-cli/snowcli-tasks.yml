@@ -47,14 +47,14 @@ tasks:
   generate-notebook:
     desc: Generates a Snowflake notebook from template by substituting environment variables.
     vars:
-      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "notebook/snowflake_iceberg_v3_template.ipynb"}}'
-      OUTPUT_FILE: '{{.OUTPUT_FILE | default "../../output/snowflake_iceberg_v3_demo_notebook.ipynb"}}'
+      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "notebook/iceberg_v3_template.ipynb"}}'
+      OUTPUT_FILE: '{{.OUTPUT_FILE | default "notebook/iceberg_v3_notebook/iceberg_v3_demo_notebook.ipynb"}}'
     cmds:
       - cmd/generate-notebook.sh "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}"
 
   deploy-notebook:
     desc: Deploys a notebook to Snowflake using the Snow CLI.
     vars:
-      NOTEBOOK_FILE: '{{.NOTEBOOK_FILE | default "../../output/snowflake_iceberg_v3_demo_notebook.ipynb"}}'
+      NOTEBOOK_FILE: '{{.NOTEBOOK_FILE | default "notebook/iceberg_v3_notebook/iceberg_v3_demo_notebook.ipynb"}}'
     cmds:
       - cmd/deploy-notebook.sh "{{.NOTEBOOK_FILE}}"
