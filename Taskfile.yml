@@ -46,7 +46,7 @@ tasks:
       - task: aws-cli:delete-s3-bucket
         vars:
           S3_BUCKET_NAME: $S3_BUCKET_NAME
-          FORCE: $FORCE
+          FORCE: --force
 
   snowflake-resources-up:
     desc: Validates Snowflake CLI, creates Snowflake external volume.
