@@ -65,6 +65,10 @@ def generate_snowflake_yml(template_path: Path, output_path: Path, variables: di
 
     yml_variables = variables.copy()
     yml_variables["internal_named_stage"] = yml_variables["internal_named_stage"].lstrip("@")
+    
+    schema_name = yml_variables["demo_schema_name"]
+    if "." in schema_name:
+        yml_variables["demo_schema_name"] = schema_name.split(".", 1)[1]
 
     content = substitute_variables(content, yml_variables)
 
