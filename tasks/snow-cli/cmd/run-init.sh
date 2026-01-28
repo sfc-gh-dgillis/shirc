@@ -19,12 +19,12 @@ fi
 # Check if required environment variables are set
 REQUIRED_VARS=(
     "DEMO_WAREHOUSE_NAME"
-    "YOUR_FIRST_NAME"
-    "YOUR_LAST_NAME"
     "EXTERNAL_VOLUME_NAME"
     "INTERNAL_NAMED_STAGE"
     "DEMO_DATABASE_NAME"
     "DEMO_SCHEMA_NAME"
+    "DEMO_ENGINEER_ROLE_NAME"
+    "DEMO_ENGINEER_USER_NAME"
 )
 
 MISSING_VARS=()
@@ -47,30 +47,30 @@ STAGE_NAME="${INTERNAL_NAMED_STAGE#@}"
 
 echo "Running Snowflake initialization script..."
 echo "  Warehouse: $DEMO_WAREHOUSE_NAME"
-echo "  First Name: $YOUR_FIRST_NAME"
-echo "  Last Name: $YOUR_LAST_NAME"
 echo "  External Volume: $EXTERNAL_VOLUME_NAME"
 echo "  Stage Name: $STAGE_NAME"
+echo "  Engineer Role: $DEMO_ENGINEER_ROLE_NAME"
+echo "  Engineer User: $DEMO_ENGINEER_USER_NAME"
 echo ""
 
 # Run snow CLI with templating
 snow sql -f "$SQL_FILE" \
   --enable-templating JINJA \
   -D demo_warehouse_name="$DEMO_WAREHOUSE_NAME" \
-  -D your_first_name="$YOUR_FIRST_NAME" \
-  -D your_last_name="$YOUR_LAST_NAME" \
   -D your_external_volume_name="$EXTERNAL_VOLUME_NAME" \
   -D demo_database_name="$DEMO_DATABASE_NAME" \
   -D demo_schema_name="$DEMO_SCHEMA_NAME" \
-  -D demo_stage_name="$STAGE_NAME"
+  -D demo_stage_name="$STAGE_NAME" \
+  -D demo_engineer_role_name="$DEMO_ENGINEER_ROLE_NAME" \
+  -D demo_engineer_user_name="$DEMO_ENGINEER_USER_NAME"
 
 # Check if command was successful
 if [ $? -eq 0 ]; then
     echo ""
     echo "Initialization completed successfully"
     echo "Database: $DEMO_DATABASE_NAME"
-    echo "Role: ${YOUR_FIRST_NAME}_${YOUR_LAST_NAME}_DATA_ENGINEER"
-    echo "User: ${YOUR_FIRST_NAME}_${YOUR_LAST_NAME}_ENGINEER_USER"
+    echo "Role: $DEMO_ENGINEER_ROLE_NAME"
+    echo "User: $DEMO_ENGINEER_USER_NAME"
 else
     echo ""
     echo "Initialization failed"

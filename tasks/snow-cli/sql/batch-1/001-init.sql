@@ -6,14 +6,10 @@ SET warehouse_name = '{{ demo_warehouse_name }}';             -- e.g., 'COMPUTE_
 SET demo_external_volume = '{{ your_external_volume_name }}'; -- e.g., 'MY_EXT_VOL'
 SET demo_database = '{{ demo_database_name }}';               -- e.g., 'DEMO_DB';
 SET demo_schema = '{{ demo_schema_name }}';                   -- e.g., 'RAW';
-SET first_name = '{{ your_first_name }}';                     -- e.g., 'JOHN'
-SET last_name = '{{ your_last_name }}';                       -- e.g., 'DOE'
+SET demo_engineer_role = '{{ demo_engineer_role_name }}';     -- e.g., 'JOHN_DOE_DATA_ENGINEER'
+SET demo_engineer_user = '{{ demo_engineer_user_name }}';     -- e.g., 'JOHN_DOE
 
 SET demo_setup_user = current_user();
-
--- Derived variables (no need to change):
-SET demo_engineer_role = $first_name || '_' || $last_name || '_DATA_ENGINEER';
-SET demo_engineer_user = $first_name || '_' || $last_name || '_ENGINEER_USER';
 
 -- Admin context
 USE ROLE ACCOUNTADMIN;
