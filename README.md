@@ -10,6 +10,7 @@ SHIRC provides automated infrastructure setup for working with Apache Iceberg ta
 - **Snowflake Resources**: External volumes, databases, schemas, roles, and stages
 - **Integration**: Automatic trust policy updates to connect AWS and Snowflake
 - **Demo Notebook**: Generates and deploys a Snowflake notebook demonstrating Iceberg V3 features
+- **Spark Demo**: Local Spark environment with Jupyter notebook connecting to Snowflake Horizon REST catalog
 
 ## Quick Start
 
@@ -20,11 +21,14 @@ SHIRC provides automated infrastructure setup for working with Apache Iceberg ta
 cp .env/iceberg.env.template .env/iceberg.env
 # Edit .env/iceberg.env with your values
 
-# 2. Set up everything
+# 2a. Set up Snowflake notebook demo
 task demo-up
+
+# 2b. OR set up local Spark + Jupyter demo
+task spark-demo-up
 ```
 
-The `demo-up` task executes the following workflow:
+Both tasks use shared infrastructure setup (`infrastructure-up`):
 
 1. **AWS Resources Setup** (`aws-resources-up`)
    - Validates AWS CLI is installed and configured
@@ -47,20 +51,28 @@ The `demo-up` task executes the following workflow:
    - Runs initialization SQL to create database, schema, roles, and stages
    - Uploads demo files to internal named stage
 
-5. **Notebook Deployment**
+**`demo-up`** then deploys a Snowflake notebook:
    - Generates notebook from template with environment variable substitution
    - Generates snowflake.yml project file
    - Deploys notebook to Snowflake
 
+**`spark-demo-up`** then sets up local Spark environment:
+   - Validates conda is installed
+   - Creates conda environment with PySpark, Jupyter, and OpenJDK
+   - Launches Jupyter notebook connecting to Snowflake Horizon REST catalog
+
 ### Teardown
 
 ```bash
-# Clean up all resources
+# Clean up Snowflake notebook demo
 task demo-teardown
+
+# Clean up Spark demo
+task spark-demo-teardown
 ```
 
 The teardown removes resources in reverse order:
-1. Drops Snowflake database
+1. Drops Snowflake database (or removes conda environment for Spark demo)
 2. Drops external volume
 3. Detaches IAM policy from role
 4. Deletes IAM role
@@ -74,6 +86,7 @@ The teardown removes resources in reverse order:
 - [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) - Snowflake command line interface
 - [jq](https://stedolan.github.io/jq/) - JSON processor (install: `brew install jq`)
 - [Python 3](https://www.python.org/) - Required for notebook generation and file uploads
+- [Conda](https://docs.conda.io/en/latest/miniconda.html) - Required for Spark demo (Miniconda recommended)
 - AWS credentials configured
 - Snowflake credentials configured
 
@@ -82,6 +95,7 @@ The teardown removes resources in reverse order:
 ```bash
 task validate-prerequisites:awscli
 task validate-prerequisites:snowcli
+task validate-prerequisites:conda
 ```
 
 ## Configuration
@@ -114,16 +128,28 @@ DEMO_ENGINEER_ROLE_NAME=V3_DEMO_ICEBERG_ENGINEER_ROLE
 DEMO_ENGINEER_USER_NAME=V3_DEMO_ICEBERG_USER
 INTERNAL_NAMED_STAGE=@your_database.your_schema.your_stage
 WAREHOUSE_NAME=COMPUTE_WH
+
+# Spark Demo Configuration
+CONDA_ENV_NAME=iceberg-lab
+SPARK_HORIZON_CATALOG_URI=https://<account>.snowflakecomputing.com/polaris/api/catalog
+SPARK_CATALOG_NAME=YOUR_DATABASE_NAME
+SPARK_SNOWFLAKE_PAT=YOUR_PAT_HERE
+SPARK_HORIZON_ROLE=session:role:YOUR_ROLE_NAME
+SPARK_ICEBERG_VERSION=1.10.0
+SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 ```
 
 ## Available Tasks
 
 ### Main Tasks
 
-| Task                 | Description                                             |
-|----------------------|---------------------------------------------------------|
-| `task demo-up`       | Complete setup: AWS + Snowflake + notebook deployment   |
-| `task demo-teardown` | Complete teardown: remove all resources                 |
+| Task                      | Description                                             |
+|---------------------------|---------------------------------------------------------|
+| `task infrastructure-up`  | Sets up AWS and Snowflake infrastructure                |
+| `task demo-up`            | Infrastructure + Snowflake notebook deployment          |
+| `task demo-teardown`      | Teardown Snowflake resources and AWS infrastructure     |
+| `task spark-demo-up`      | Infrastructure + Spark/Jupyter environment              |
+| `task spark-demo-teardown`| Teardown Spark environment and infrastructure           |
 
 ### AWS Resource Tasks
 
@@ -155,6 +181,14 @@ WAREHOUSE_NAME=COMPUTE_WH
 | `task snow-cli:generate-notebook`               | Generate notebook from template                       |
 | `task snow-cli:deploy-notebook`                 | Deploy notebook to Snowflake                          |
 | `task snow-cli:drop-database-if-exists`         | Drop database if it exists                            |
+
+### Python/Spark Tasks
+
+| Task                              | Description                                           |
+|-----------------------------------|-------------------------------------------------------|
+| `task python-tasks:create-conda-env`  | Create conda environment with PySpark and Jupyter |
+| `task python-tasks:remove-conda-env`  | Remove conda environment                          |
+| `task python-tasks:run-jupyter`       | Launch Jupyter notebook in conda environment      |
 
 ## Architecture
 
