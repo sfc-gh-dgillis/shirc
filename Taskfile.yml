@@ -93,7 +93,8 @@ tasks:
       - task: aws-resources-teardown
 
   spark-demo-up:
-    desc: Sets up SPAHK
+    desc: Sets up Spark demo environment and launches Jupyter
     cmds:
       - task: validate-prerequisites:conda
       - task: python-tasks:create-conda-env
+      - task: python-tasks:run-jupyter
