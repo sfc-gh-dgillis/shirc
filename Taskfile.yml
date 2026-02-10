@@ -6,6 +6,7 @@ includes:
   snow-cli:
     taskfile: ./tasks/snow-cli/snowcli-tasks.yml
     dir: ./tasks/snow-cli
+  python-tasks: ./tasks/python/python-tasks.yml
 
 env:
   ENV_DIR: .env
@@ -90,3 +91,9 @@ tasks:
     cmds:
       - task: snowflake-resources-teardown
       - task: aws-resources-teardown
+
+  spark-demo-up:
+    desc: Sets up SPAHK
+    cmds:
+      - task: validate-prerequisites:conda
+      - task: python-tasks:create-conda-env

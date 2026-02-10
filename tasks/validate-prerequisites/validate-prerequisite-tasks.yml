@@ -12,7 +12,7 @@ tasks:
     cmds:
       - ./tasks/validate-prerequisites/cmd/validate-snowcli.sh
 
-  uv:
-    desc: Validates that uv (Python package installer) is installed.
+  conda:
+    desc: Validates that conda is installed.
     cmds:
-      - ./tasks/validate-prerequisites/cmd/validate-uv.sh
+      - ./tasks/validate-prerequisites/cmd/validate-conda.sh
