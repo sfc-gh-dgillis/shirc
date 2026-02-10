@@ -18,4 +18,4 @@ tasks:
   run-jupyter:
     desc: Run Jupyter notebook in conda environment
     cmds:
-      - conda run -n {{.CONDA_ENV_NAME | default "iceberg-lab"}} jupyter notebook
+      - conda run -n {{.CONDA_ENV_NAME | default "iceberg-lab"}} jupyter notebook {{.SPARK_NOTEBOOK_PATH | default "tasks/python/notebook/horizon_v3_variant_spark.ipynb"}}
