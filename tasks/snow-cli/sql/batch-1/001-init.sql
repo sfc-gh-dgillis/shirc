@@ -34,34 +34,41 @@ GRANT ROLE IDENTIFIER($DEMO_ENGINEER_ROLE) TO USER IDENTIFIER($DEMO_SETUP_USER);
 ALTER USER IDENTIFIER($DEMO_ENGINEER_USER) SET DEFAULT_ROLE = $DEMO_ENGINEER_ROLE;
 
 -- ========================================================================
--- STEP 4: Users for each role, each user needs a Personal Access Token
+-- STEP 4: Grant resource access to demo roles
 -- ========================================================================
 --GRANT USAGE ON INTEGRATION ICEBERG_S3_INT TO ROLE DATA_ENGINEER; -- optional
 GRANT USAGE ON EXTERNAL VOLUME IDENTIFIER($DEMO_EXTERNAL_VOLUME) TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
 -- Analysts only read (no create), so USAGE on EXTERNAL VOLUME is not strictly required for them.
+GRANT USAGE ON WAREHOUSE IDENTIFIER($WAREHOUSE_NAME) TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
 
 -- ========================================================================
 -- STEP 5: Create Database, Schemas, and grants on them
 -- ========================================================================
 CREATE DATABASE IF NOT EXISTS IDENTIFIER($DEMO_DATABASE);
 
---Important note for PrPr, required
---Set external volume at database level that will be  used to create iceberg table
+-- Required: set external volume at database level so all Iceberg tables inherit it
 ALTER DATABASE IDENTIFIER($DEMO_DATABASE) SET EXTERNAL_VOLUME = IDENTIFIER($DEMO_EXTERNAL_VOLUME);
 
 USE DATABASE IDENTIFIER($DEMO_DATABASE);
 
+-- Primary schema for raw events (referenced as RAW in the notebook and Spark demo)
 CREATE SCHEMA IF NOT EXISTS IDENTIFIER($DEMO_SCHEMA);
 
--- Allow engineer to create tables in these schemas
-GRANT USAGE ON DATABASE IDENTIFIER($DEMO_DATABASE)TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
+-- Schema for AI-redacted tables (created by the notebook's AI_REDACT step)
+CREATE SCHEMA IF NOT EXISTS REDACTED;
+
+-- Grant database + all schemas (both RAW and REDACTED) to engineer role
+GRANT USAGE ON DATABASE IDENTIFIER($DEMO_DATABASE) TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
 GRANT USAGE ON ALL SCHEMAS IN DATABASE IDENTIFIER($DEMO_DATABASE) TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
 
+-- Grant table creation rights on both schemas
 GRANT CREATE ICEBERG TABLE ON SCHEMA IDENTIFIER($DEMO_SCHEMA) TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
-
 GRANT MONITOR ON SCHEMA IDENTIFIER($DEMO_SCHEMA) TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
 
---CREATE STAGE
+GRANT CREATE ICEBERG TABLE ON SCHEMA REDACTED TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
+GRANT MONITOR ON SCHEMA REDACTED TO ROLE IDENTIFIER($DEMO_ENGINEER_ROLE);
+
+-- Create the internal named stage for JSON file uploads
 USE DATABASE IDENTIFIER($DEMO_DATABASE);
 USE SCHEMA IDENTIFIER($DEMO_SCHEMA);
 

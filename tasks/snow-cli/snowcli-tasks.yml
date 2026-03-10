@@ -39,6 +39,43 @@ tasks:
     cmds:
       - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
 
+  run-ddl:
+    desc: Runs a SQL batch file with Jinja templating (engineer role context).
+    cmds:
+      - cmd/run-ddl.sh "{{.SQL_FILE}}"
+
+  create-tables:
+    desc: Creates standalone Iceberg V3 feature-showcase tables (batch-2/001-create-tables.sql).
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/001-create-tables.sql"}}'
+    cmds:
+      - task: run-ddl
+        vars: {SQL_FILE: "{{.SQL_FILE}}"}
+
+  load-data:
+    desc: Loads staged JSON data into batch-2 Iceberg V3 tables (batch-2/002-load-data.sql).
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/002-load-data.sql"}}'
+    cmds:
+      - task: run-ddl
+        vars: {SQL_FILE: "{{.SQL_FILE}}"}
+
+  run-dml-demo:
+    desc: Runs DML demo showing deletion vectors and row lineage (batch-2/003-dml-demo.sql).
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/003-dml-demo.sql"}}'
+    cmds:
+      - task: run-ddl
+        vars: {SQL_FILE: "{{.SQL_FILE}}"}
+
+  drop-tables:
+    desc: Drops Iceberg V3 demo tables (batch-2/teardown.sql).
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/teardown.sql"}}'
+    cmds:
+      - task: run-ddl
+        vars: {SQL_FILE: "{{.SQL_FILE}}"}
+
   drop-database-if-exists:
     desc: Drops the specified Snowflake database if it exists using the Snowflake CLI.
     cmds:
