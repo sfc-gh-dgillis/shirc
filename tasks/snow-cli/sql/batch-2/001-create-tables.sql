@@ -47,7 +47,7 @@ CREATE ICEBERG TABLE IF NOT EXISTS customer_events_partitioned (
     region     STRING,
     payload    VARIANT
 )
-PARTITION BY (DAY(event_date), region)    -- temporal + identity transforms
+PARTITION BY (DAY(event_date), region)   -- temporal + identity transforms
 PATH_LAYOUT  = HIERARCHICAL              -- V3: hierarchical directory layout
 ENABLE_ICEBERG_MERGE_ON_READ = TRUE      -- V3: deletion vectors for DML
 ICEBERG_VERSION = 3

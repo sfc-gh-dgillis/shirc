@@ -1,1 +1,0 @@
-DESC EXTERNAL VOLUME {{ external_volume_name }};
