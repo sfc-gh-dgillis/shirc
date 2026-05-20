@@ -28,6 +28,13 @@ tasks:
     cmds:
       - cmd/run-init.sh "{{.SQL_FILE}}"
 
+  run-init-managed:
+    desc: Runs Snowflake init for managed storage mode (no external volume required).
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/batch-1/001-init-managed.sql"}}'
+    cmds:
+      - cmd/run-init-managed.sh "{{.SQL_FILE}}"
+
   upload-files-to-internal-named-stage:
     desc: Uploads all files from the given directory to a Snowflake Internal stage using the Snowflake CLI and PUT command.
     vars:
@@ -92,3 +99,10 @@ tasks:
       PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/iceberg_v3_notebook"}}'
     cmds:
       - cmd/deploy-notebook.sh "{{.PROJECT_DIR}}"
+
+  stream-telemetry:
+    desc: Streams simulated vehicle telemetry into Iceberg V3 table via Snowpipe Streaming SDK.
+    vars:
+      EVENT_COUNT: '{{.EVENT_COUNT | default "100"}}'
+    cmds:
+      - python3 pyutil/snowpipe_streaming/stream_telemetry.py --events {{.EVENT_COUNT}}

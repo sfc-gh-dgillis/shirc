@@ -29,6 +29,13 @@ The `.env/iceberg.env` file is git-ignored. The `Taskfile.yml` loads it via `dot
 DOTENV_FILENAME=other.env task demo-up
 ```
 
+### Storage Mode
+
+The `STORAGE_MODE` variable in `.env/iceberg.env` controls where Iceberg table data is stored:
+
+- **`managed`** (default) — Uses Snowflake Managed Storage. No AWS infrastructure is needed. Snowflake handles all storage internally via `EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'`. Only Snowflake CLI prerequisites are required.
+- **`external`** — Uses your own AWS S3 bucket. Requires full AWS configuration (S3 bucket, IAM policy, IAM role, trust policy). The automation creates an external volume in Snowflake pointing to S3 and establishes cross-account trust.
+
 ## Key Commands
 
 ```bash

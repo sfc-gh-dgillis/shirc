@@ -69,7 +69,22 @@ CATALOG         = 'SNOWFLAKE'
 BASE_LOCATION   = 'iot_events';
 
 -- ========================================================================
--- TABLE 4: daily_event_counts (Dynamic Iceberg Table)
+-- TABLE 4: vehicle_telemetry_stream
+-- Demonstrates: Snowpipe Streaming into Iceberg V3 VARIANT columns
+-- Data is ingested via the Snowpipe Streaming Python SDK (see
+-- pyutil/snowpipe_streaming/stream_telemetry.py).
+-- ========================================================================
+CREATE ICEBERG TABLE IF NOT EXISTS vehicle_telemetry_stream (
+    vehicle_id    STRING           NOT NULL,
+    event_ts      TIMESTAMP_LTZ(6) DEFAULT CURRENT_TIMESTAMP(),
+    telemetry     VARIANT
+)
+ICEBERG_VERSION = 3
+CATALOG         = 'SNOWFLAKE'
+BASE_LOCATION   = 'vehicle_telemetry_stream';
+
+-- ========================================================================
+-- TABLE 5: daily_event_counts (Dynamic Iceberg Table)
 -- Demonstrates: Dynamic Iceberg V3 tables (auto-refreshed materialized view)
 -- Note: TARGET_LAG drives automatic incremental refresh from the source table.
 -- ========================================================================
