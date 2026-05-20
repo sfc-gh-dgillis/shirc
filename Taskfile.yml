@@ -68,7 +68,7 @@ tasks:
       - task: snow-cli:drop-database-if-exists
         vars:
           CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
-          DATABASE_NAME: $DATABASE_NAME
+          DEMO_DATABASE_NAME: $DEMO_DATABASE_NAME
       - task: snow-cli:drop-external-volume
         vars:
           EXTERNAL_VOLUME_NAME: $EXTERNAL_VOLUME_NAME

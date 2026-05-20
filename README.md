@@ -1,25 +1,26 @@
 # SHIRC - Snowflake Horizon Iceberg REST Catalog
 
-> Automated setup and management of AWS and Snowflake resources for Apache Iceberg tables
+> Automated setup and management of Snowflake infrastructure for Apache Iceberg tables
 
 ## Overview
 
 SHIRC provides automated infrastructure setup for working with Apache Iceberg tables through Snowflake's Horizon REST catalog. Using Task automation, it handles:
 
-- **AWS Resources**: S3 buckets, IAM policies, and roles with trust relationships
-- **Snowflake Resources**: External volumes, databases, schemas, roles, and stages
-- **Integration**: Automatic trust policy updates to connect AWS and Snowflake
+- **Snowflake Managed Storage** (default): Zero-config Iceberg tables using `EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'` — no AWS setup required
+- **External S3 Storage** (optional): S3 buckets, IAM policies, and roles with trust relationships for bring-your-own storage
+- **Snowflake Resources**: Databases, schemas, roles, stages, and Iceberg V3 tables
+- **Snowpipe Streaming**: Real-time data ingestion into Iceberg V3 tables via the Snowpipe Streaming Python SDK
 - **Demo Notebook**: Generates and deploys a Snowflake notebook demonstrating Iceberg V3 features
 - **Spark Demo**: Local Spark environment with Jupyter notebook connecting to Snowflake Horizon REST catalog
 
 ## Quick Start
 
-### One-Command Setup
+### One-Command Setup (Managed Storage — No AWS Required)
 
 ```bash
 # 1. Configure environment
 cp .env/iceberg.env.template .env/iceberg.env
-# Edit .env/iceberg.env with your values
+# Edit .env/iceberg.env with your Snowflake values (STORAGE_MODE=managed is the default)
 
 # 2a. Set up Snowflake notebook demo
 task demo-up
@@ -28,38 +29,25 @@ task demo-up
 task spark-demo-up
 ```
 
-Both tasks use shared infrastructure setup (`infrastructure-up`):
+### One-Command Setup (External S3 Storage)
 
-1. **AWS Resources Setup** (`aws-resources-up`)
-   - Validates AWS CLI is installed and configured
-   - Creates S3 bucket for Iceberg data storage
-   - Generates IAM policy for S3 bucket access
-   - Creates IAM policy in AWS
-   - Generates trust policy for cross-account access
-   - Creates IAM role with trust policy
-   - Attaches IAM policy to role
+```bash
+# 1. Configure environment
+cp .env/iceberg.env.template .env/iceberg.env
+# Set STORAGE_MODE=external and fill in AWS + Snowflake values
 
-2. **Snowflake Resources Setup** (`snowflake-resources-up`)
-   - Validates Snowflake CLI is installed and configured
-   - Creates external volume pointing to S3 bucket
-   - Describes external volume to get Snowflake's IAM user ARN
+# 2. Set up demo (creates AWS resources + Snowflake integration)
+task demo-up
+```
 
-3. **AWS-Snowflake Integration**
-   - Updates IAM role trust policy with Snowflake's IAM user ARN
+### How It Routes
 
-4. **Snowflake Demo Environment Setup**
-   - Runs initialization SQL to create database, schema, roles, and stages
-   - Uploads demo files to internal named stage
+`infrastructure-up` dispatches based on `STORAGE_MODE`:
 
-**`demo-up`** then deploys a Snowflake notebook:
-   - Generates notebook from template with environment variable substitution
-   - Generates snowflake.yml project file
-   - Deploys notebook to Snowflake
+- **`managed`** (default): Validates Snowflake CLI → runs managed init SQL → uploads demo files
+- **`external`**: Creates AWS resources → creates Snowflake external volume → updates trust policy → runs init SQL → uploads demo files
 
-**`spark-demo-up`** then sets up local Spark environment:
-   - Validates conda is installed
-   - Creates conda environment with PySpark, Jupyter, and OpenJDK
-   - Launches Jupyter notebook connecting to Snowflake Horizon REST catalog
+After infrastructure is ready, `demo-up` generates and deploys the Snowflake notebook.
 
 ### Teardown
 
@@ -71,31 +59,31 @@ task demo-teardown
 task spark-demo-teardown
 ```
 
-The teardown removes resources in reverse order:
-1. Drops Snowflake database (or removes conda environment for Spark demo)
-2. Drops external volume
-3. Detaches IAM policy from role
-4. Deletes IAM role
-5. Deletes IAM policy
-6. Deletes S3 bucket (with force flag to remove contents)
+Teardown also routes by `STORAGE_MODE`:
+- **Managed**: Drops the Snowflake database (one command — no AWS resources to clean up)
+- **External**: Drops Snowflake database and external volume, then deletes IAM role, IAM policy, and S3 bucket
 
 ## Prerequisites
 
 - [Task](https://taskfile.dev/) - Task runner (install: `brew install go-task`)
-- [AWS CLI](https://aws.amazon.com/cli/) - AWS command line interface
 - [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) - Snowflake command line interface
 - [jq](https://stedolan.github.io/jq/) - JSON processor (install: `brew install jq`)
 - [Python 3](https://www.python.org/) - Required for notebook generation and file uploads
-- [Conda](https://docs.conda.io/en/latest/miniconda.html) - Required for Spark demo (Miniconda recommended)
-- AWS credentials configured
-- Snowflake credentials configured
+
+**Additional prerequisites by feature:**
+
+| Feature | Requirement |
+|---------|-------------|
+| `STORAGE_MODE=external` | [AWS CLI](https://aws.amazon.com/cli/) + configured AWS credentials |
+| Spark demo | [Conda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda recommended) |
+| Snowpipe Streaming | `pip install snowpipe-streaming cryptography` + key-pair auth configured |
 
 ### Validate Prerequisites
 
 ```bash
-task validate-prerequisites:awscli
 task validate-prerequisites:snowcli
-task validate-prerequisites:conda
+task validate-prerequisites:awscli    # only needed for external storage mode
+task validate-prerequisites:conda     # only needed for Spark demo
 ```
 
 ## Configuration
@@ -108,28 +96,48 @@ Copy the template and edit `.env/iceberg.env`:
 cp .env/iceberg.env.template .env/iceberg.env
 ```
 
-Required variables:
+Use a custom env file by setting `DOTENV_FILENAME`:
 
 ```bash
-# AWS Configuration
+DOTENV_FILENAME=other.env task demo-up
+```
+
+#### Storage Mode
+
+```bash
+# Controls where Iceberg table data is stored:
+#   "managed"  - Snowflake Managed Storage (no AWS setup needed, default)
+#   "external" - Your own AWS S3 bucket (requires AWS Configuration below)
+STORAGE_MODE=managed
+```
+
+#### Snowflake Configuration (always required)
+
+```bash
+CLI_CONNECTION_NAME=your_snowflake_connection
+DEMO_DATABASE_NAME=yourdbnamehere
+DEMO_SCHEMA_NAME=RAW
+DEMO_ENGINEER_ROLE_NAME=V3_DEMO_ICEBERG_ENGINEER_ROLE
+DEMO_ENGINEER_USER_NAME=V3_DEMO_ICEBERG_USER
+INTERNAL_NAMED_STAGE=@yourdbnamehere.RAW.yourstagename
+DEMO_WAREHOUSE_NAME=COMPUTE_WH
+EXTERNAL_VOLUME_NAME=my_iceberg_ext_vol  # only used when STORAGE_MODE=external
+```
+
+#### AWS Configuration (only when `STORAGE_MODE=external`)
+
+```bash
 AWS_REGION=us-east-1
 S3_BUCKET_NAME=your-bucket-name
 S3_PREFIX=snowflake-iceberg
 IAM_POLICY_NAME=YourIcebergAccessPolicy
 IAM_ROLE_NAME=YourIcebergAccessRole
 TRUST_POLICY_EXTERNAL_ID=your-external-id
+```
 
-# Snowflake Configuration
-CLI_CONNECTION_NAME=your_snowflake_connection
-EXTERNAL_VOLUME_NAME=iceberg_ext_vol
-DEMO_DATABASE_NAME=your_database
-DEMO_SCHEMA_NAME=your_database.your_schema
-DEMO_ENGINEER_ROLE_NAME=V3_DEMO_ICEBERG_ENGINEER_ROLE
-DEMO_ENGINEER_USER_NAME=V3_DEMO_ICEBERG_USER
-INTERNAL_NAMED_STAGE=@your_database.your_schema.your_stage
-WAREHOUSE_NAME=COMPUTE_WH
+#### Spark Demo Configuration
 
-# Spark Demo Configuration
+```bash
 CONDA_ENV_NAME=iceberg-lab
 SPARK_HORIZON_CATALOG_URI=https://<account>.snowflakecomputing.com/polaris/api/catalog
 SPARK_CATALOG_NAME=YOUR_DATABASE_NAME
@@ -143,15 +151,15 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 
 ### Main Tasks
 
-| Task                      | Description                                             |
-|---------------------------|---------------------------------------------------------|
-| `task infrastructure-up`  | Sets up AWS and Snowflake infrastructure                |
-| `task demo-up`            | Infrastructure + Snowflake notebook deployment          |
-| `task demo-teardown`      | Teardown Snowflake resources and AWS infrastructure     |
-| `task spark-demo-up`      | Infrastructure + Spark/Jupyter environment              |
-| `task spark-demo-teardown`| Teardown Spark environment and infrastructure           |
+| Task                      | Description                                                         |
+|---------------------------|---------------------------------------------------------------------|
+| `task infrastructure-up`  | Sets up infrastructure (routes by `STORAGE_MODE`)                   |
+| `task demo-up`            | Infrastructure + Snowflake notebook deployment                      |
+| `task demo-teardown`      | Teardown (routes by `STORAGE_MODE`)                                 |
+| `task spark-demo-up`      | Infrastructure + Spark/Jupyter environment                          |
+| `task spark-demo-teardown`| Teardown Spark environment + infrastructure                         |
 
-### AWS Resource Tasks
+### AWS Resource Tasks (external storage mode only)
 
 | Task                                                   | Description                                                      |
 |--------------------------------------------------------|------------------------------------------------------------------|
@@ -166,21 +174,35 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 | `task aws-cli:attach-policy-to-role`                   | Attach policy to role                                            |
 | `task aws-cli:detach-policy-from-role`                 | Detach policy from role                                          |
 | `task aws-cli:update-trust-policy-with-snowflake-user` | Update trust policy with Snowflake IAM user                      |
+| `task aws-cli:refresh-sso-token`                       | Refresh AWS SSO token (set `AWS_PROFILE`)                        |
+| `task aws-cli:list-profiles`                           | List all configured AWS profiles                                 |
 
 ### Snowflake Resource Tasks
 
-| Task                                            | Description                                           |
-|-------------------------------------------------|-------------------------------------------------------|
-| `task snowflake-resources-up`                   | Create and describe external volume                   |
-| `task snowflake-resources-teardown`             | Drop database and external volume                     |
-| `task snow-cli:create-external-volume`          | Create external volume only                           |
-| `task snow-cli:drop-external-volume`            | Drop external volume only                             |
-| `task snow-cli:desc-external-volume`            | Describe external volume and save JSON                |
-| `task snow-cli:run-init`                        | Run initialization SQL script                         |
-| `task snow-cli:upload-files-to-internal-named-stage` | Upload files to internal stage                   |
-| `task snow-cli:generate-notebook`               | Generate notebook from template                       |
-| `task snow-cli:deploy-notebook`                 | Deploy notebook to Snowflake                          |
-| `task snow-cli:drop-database-if-exists`         | Drop database if it exists                            |
+| Task                                                 | Description                                                |
+|------------------------------------------------------|------------------------------------------------------------|
+| `task snowflake-resources-up`                        | Create and describe external volume                        |
+| `task snowflake-resources-teardown`                  | Drop database and external volume                          |
+| `task snowflake-resources-teardown-managed`          | Drop database only (managed mode)                          |
+| `task snow-cli:create-external-volume`               | Create external volume only                                |
+| `task snow-cli:drop-external-volume`                 | Drop external volume only                                  |
+| `task snow-cli:desc-external-volume`                 | Describe external volume and save JSON                     |
+| `task snow-cli:run-init`                             | Run initialization SQL (external mode)                     |
+| `task snow-cli:run-init-managed`                     | Run initialization SQL (managed mode, no external volume)  |
+| `task snow-cli:upload-files-to-internal-named-stage` | Upload files to internal stage                             |
+| `task snow-cli:generate-notebook`                    | Generate notebook from template                            |
+| `task snow-cli:deploy-notebook`                      | Deploy notebook to Snowflake                               |
+| `task snow-cli:drop-database-if-exists`              | Drop database if it exists                                 |
+
+### Iceberg V3 Feature Tables (batch-2)
+
+| Task                            | Description                                                          |
+|---------------------------------|----------------------------------------------------------------------|
+| `task snow-cli:create-tables`   | Create Iceberg V3 feature-showcase tables                            |
+| `task snow-cli:load-data`       | Load staged JSON data into batch-2 tables                            |
+| `task snow-cli:run-dml-demo`    | Run DML demo (deletion vectors, row lineage)                         |
+| `task snow-cli:drop-tables`     | Drop batch-2 demo tables                                            |
+| `task snow-cli:stream-telemetry`| Stream simulated vehicle telemetry via Snowpipe Streaming SDK        |
 
 ### Python/Spark Tasks
 
@@ -192,7 +214,35 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 
 ## Architecture
 
-### What Gets Created
+### Managed Mode (default)
+
+```text
++-------------------------------------------------------------+
+|                    Snowflake Account                         |
+|                                                             |
+|  EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'                      |
+|  (Snowflake handles all storage internally)                 |
+|                                                             |
+|  +-------------------------------------------------------+  |
+|  |   Database: your_database                             |  |
+|  |   +-- Schema: RAW                                     |  |
+|  |   |   +-- Stage: your_stage (internal)                |  |
+|  |   |   +-- Iceberg V3 Tables                           |  |
+|  |   |       +-- CUSTOMER_EVENTS (VARIANT)               |  |
+|  |   |       +-- vehicle_telemetry_stream (streaming)    |  |
+|  |   +-- Schema: REDACTED                                |  |
+|  |       +-- CUSTOMER_EVENTS_REDACTED (AI_REDACT)        |  |
+|  +-------------------------------------------------------+  |
+|                                                             |
+|  +-------------------------------------------------------+  |
+|  |   Role: V3_DEMO_ICEBERG_ENGINEER_ROLE                 |  |
+|  |   Notebook: iceberg_v3_demo_notebook                  |  |
+|  +-------------------------------------------------------+  |
+|                                                             |
++-------------------------------------------------------------+
+```
+
+### External Storage Mode
 
 ```text
 +-------------------------------------------------------------+
@@ -216,7 +266,7 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
                                            | AssumeRole
                                            v
 +-------------------------------------------------------------+
-|                    Snowflake Account                        |
+|                    Snowflake Account                         |
 |                                                             |
 |  +-------------------------------------------------------+  |
 |  |   External Volume: iceberg_ext_vol                    |  |
@@ -227,9 +277,9 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 |                                                             |
 |  +-------------------------------------------------------+  |
 |  |   Database: your_database                             |  |
-|  |   +-- Schema: your_schema                             |  |
+|  |   +-- Schema: RAW                                     |  |
 |  |       +-- Stage: your_stage (internal)                |  |
-|  |       +-- Iceberg Tables                              |  |
+|  |       +-- Iceberg V3 Tables                           |  |
 |  +-------------------------------------------------------+  |
 |                                                             |
 |  +-------------------------------------------------------+  |
@@ -240,22 +290,50 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 +-------------------------------------------------------------+
 ```
 
-## Usage Examples
+## Snowpipe Streaming
 
-### Complete Setup and Teardown
+The `stream-telemetry` task demonstrates real-time ingestion into an Iceberg V3 table via the [Snowpipe Streaming Python SDK](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-overview):
 
 ```bash
-# Set up everything
+# Stream 100 simulated vehicle telemetry events (default)
+task snow-cli:stream-telemetry
+
+# Stream a custom number of events
+task snow-cli:stream-telemetry EVENT_COUNT=500
+```
+
+**Requirements:**
+- Key-pair authentication configured in your Snow CLI connection (`private_key_path`)
+- Python dependencies: `pip install snowpipe-streaming cryptography`
+- Target table `VEHICLE_TELEMETRY_STREAM` created via `task snow-cli:create-tables`
+
+The script reads credentials from your Snow CLI `~/.snowflake/config.toml` using the `CLI_CONNECTION_NAME` connection.
+
+## Usage Examples
+
+### Complete Setup and Teardown (Managed)
+
+```bash
+# Set up everything (no AWS needed)
 task demo-up
 
-# Use your Iceberg tables in Snowflake
 # Open the deployed notebook in Snowsight to run the demo
 
-# Clean up everything
+# Clean up
 task demo-teardown
 ```
 
-### Step-by-Step Setup
+### Complete Setup and Teardown (External)
+
+```bash
+# Set STORAGE_MODE=external in .env/iceberg.env first
+task demo-up
+
+# Clean up (removes both Snowflake and AWS resources)
+task demo-teardown
+```
+
+### Step-by-Step Setup (External Mode)
 
 ```bash
 # 1. Create AWS resources
@@ -278,6 +356,25 @@ task snow-cli:generate-notebook
 task snow-cli:deploy-notebook
 ```
 
+### Batch-2 Feature Tables
+
+```bash
+# Create standalone Iceberg V3 feature-showcase tables
+task snow-cli:create-tables
+
+# Load data
+task snow-cli:load-data
+
+# Run DML demo (deletion vectors, row lineage)
+task snow-cli:run-dml-demo
+
+# Stream telemetry data
+task snow-cli:stream-telemetry
+
+# Tear down batch-2 tables only
+task snow-cli:drop-tables
+```
+
 ### Individual Operations
 
 ```bash
@@ -295,7 +392,7 @@ task snow-cli:desc-external-volume EXTERNAL_VOLUME_NAME=my_ext_vol
 
 ```text
 shirc/
-+-- Taskfile.yml                      # Main task definitions
++-- Taskfile.yml                      # Main task definitions (routes by STORAGE_MODE)
 +-- .env/
 |   +-- iceberg.env.template          # Configuration template
 |   +-- iceberg.env                   # Your config (git-ignored)
@@ -303,17 +400,37 @@ shirc/
 |   +-- aws-cli/
 |   |   +-- awscli-tasks.yml          # AWS CLI task definitions
 |   |   +-- cmd/                      # AWS CLI scripts
-|   |   +-- json/template/            # JSON templates
+|   |   +-- json/template/            # JSON templates (bucket-policy, trust-policy)
 |   +-- snow-cli/
 |   |   +-- snowcli-tasks.yml         # Snowflake CLI task definitions
 |   |   +-- cmd/                      # Snowflake CLI scripts
-|   |   |   +-- generate-notebook.py  # Notebook generation script
-|   |   |   +-- deploy-notebook.sh    # Notebook deployment script
-|   |   +-- sql/                      # SQL templates
+|   |   |   +-- run-init.sh           # Init script (external mode)
+|   |   |   +-- run-init-managed.sh   # Init script (managed mode)
+|   |   |   +-- generate-notebook.sh  # Notebook generation
+|   |   |   +-- deploy-notebook.sh    # Notebook deployment
+|   |   +-- sql/
+|   |   |   +-- batch-0/              # External volume DDL
+|   |   |   +-- batch-1/
+|   |   |   |   +-- 001-init.sql              # Init SQL (external mode)
+|   |   |   |   +-- 001-init-managed.sql      # Init SQL (managed mode)
+|   |   |   +-- batch-2/
+|   |   |       +-- 001-create-tables.sql     # Iceberg V3 feature tables
+|   |   |       +-- 002-load-data.sql         # Data loading
+|   |   |       +-- 003-dml-demo.sql          # DML demo (deletion vectors)
+|   |   |       +-- teardown.sql              # Drop batch-2 tables
 |   |   +-- notebook/                 # Notebook templates
 |   |   |   +-- iceberg_v3_template.ipynb
 |   |   |   +-- iceberg_v3_demo_snowflake_yml_template.yml
-|   |   +-- pyutil/                   # Python utilities
+|   |   +-- pyutil/
+|   |       +-- snowcliput/           # Python utility for file uploads to stages
+|   |       +-- snowclisp/            # Python utility for stored procedures
+|   |       +-- snowpipe_streaming/   # Snowpipe Streaming SDK integration
+|   |       |   +-- stream_telemetry.py   # Vehicle telemetry data generator
+|   |       |   +-- requirements.txt
+|   |       +-- genagentsql/          # SQL generation utility
+|   +-- python/
+|   |   +-- python-tasks.yml          # Conda/Spark task definitions
+|   |   +-- notebook/                 # Spark/Jupyter notebooks
 |   +-- validate-prerequisites/
 |       +-- validate-prerequisite-tasks.yml
 +-- upload/                           # Files to upload to internal stage
@@ -324,32 +441,31 @@ shirc/
 |   +-- trust-policy-updated.json     # Updated trust policy
 |   +-- external-volume-desc.json     # External volume description
 |   +-- external-volume-desc-storage-location.json
-+-- README.md                         # This file
++-- README.md
++-- AGENTS.md                         # AI agent instructions
 ```
 
 ## How It Works
 
-### AWS Resources Setup
+### Managed Storage Mode
 
-1. **S3 Bucket**: Created in your specified region with the configured prefix
+1. **Initialization SQL**: Creates database with `EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'`, schemas (RAW + REDACTED), roles, users, and internal stage
+2. **File Upload**: Uploads demo JSON files to internal named stage
+3. **Notebook**: Generates and deploys demo notebook
+
+### External Storage Mode
+
+1. **S3 Bucket**: Created in your specified region
 2. **IAM Policy**: Generated from template with S3 permissions (ListBucket, GetObject, PutObject, DeleteObject)
-3. **IAM Role**: Created with initial trust policy (trusts your AWS account)
+3. **IAM Role**: Created with trust policy (trusts your AWS account)
 4. **Policy Attachment**: IAM policy attached to the role
+5. **External Volume**: Created in Snowflake pointing to your S3 bucket
+6. **Trust Policy Update**: AWS role trust policy updated to allow Snowflake's IAM user to assume the role
+7. **Initialization SQL**: Creates database, schema, roles, users, and internal stage
+8. **File Upload**: Uploads demo JSON files to internal named stage
+9. **Notebook**: Generates and deploys demo notebook
 
-### Snowflake Integration
-
-1. **External Volume**: Created in Snowflake pointing to your S3 bucket
-2. **Description**: External volume details retrieved including Snowflake's IAM user ARN
-3. **Trust Policy Update**: AWS role trust policy updated to allow Snowflake's IAM user to assume the role
-
-### Demo Environment Setup
-
-1. **Initialization SQL**: Creates database, schema, roles, users, and internal stage
-2. **File Upload**: Uploads demo JSON files to internal named stage using Python utility
-3. **Notebook Generation**: Generates notebook from template with Jinja variable substitution
-4. **Notebook Deployment**: Deploys notebook to Snowflake using `snow notebook deploy`
-
-### Resource Metadata
+### Resource Metadata (external mode)
 
 All generated resource details are stored in the `output/` directory:
 
@@ -397,35 +513,44 @@ cat output/aws-output.json | jq '.'
 cat output/external-volume-desc-storage-location.json | jq '.'
 ```
 
-## Resources
-
-### Documentation
-
-- [Apache Iceberg](https://iceberg.apache.org/) - Open table format specification
-- [Snowflake Iceberg Tables](https://docs.snowflake.com/en/user-guide/tables-iceberg) - Snowflake Iceberg documentation
-- [Task Documentation](https://taskfile.dev/) - Task runner documentation
-- [AWS CLI Reference](https://docs.aws.amazon.com/cli/) - AWS CLI documentation
-- [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) - Snowflake CLI documentation
-
 ## What You Get
 
-After running `task demo-up`, you will have:
+After running `task demo-up` (managed mode), you will have:
+
+- Database with schemas (RAW + REDACTED), roles, and internal stage
+- Demo files uploaded to internal stage
+- Deployed notebook ready to run in Snowsight
+
+After running `task demo-up` (external mode), you additionally get:
 
 - S3 bucket ready for Iceberg data storage
 - IAM role with proper permissions and trust policy
 - Snowflake external volume configured and integrated
-- Database with schema, roles, and internal stage
-- Demo files uploaded to internal stage
-- Deployed notebook ready to run in Snowsight
 - All resource metadata saved in JSON files
 
-You can then open the deployed notebook in Snowsight to:
+The deployed notebook demonstrates:
 
-- Create Iceberg V3 tables with VARIANT columns
-- Load JSON data into VARIANT columns
-- Query VARIANT data using semi-structured notation
-- Extract data using AI_EXTRACT()
-- Redact PII using AI_REDACT()
+- Creating Iceberg V3 tables with VARIANT columns
+- Loading JSON data into VARIANT columns
+- Querying VARIANT data using semi-structured notation
+- Redacting PII using AI_REDACT()
+
+The batch-2 feature tables demonstrate:
+
+- Partitioned Iceberg V3 tables
+- IoT event ingestion
+- Real-time streaming via Snowpipe Streaming SDK
+- Dynamic Iceberg tables (auto-refreshed)
+- DML operations with deletion vectors and row lineage
+
+## Resources
+
+- [Apache Iceberg](https://iceberg.apache.org/) - Open table format specification
+- [Snowflake Iceberg Tables](https://docs.snowflake.com/en/user-guide/tables-iceberg) - Snowflake Iceberg documentation
+- [Snowpipe Streaming](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-overview) - Real-time ingestion
+- [Task Documentation](https://taskfile.dev/) - Task runner documentation
+- [AWS CLI Reference](https://docs.aws.amazon.com/cli/) - AWS CLI documentation
+- [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) - Snowflake CLI documentation
 
 ## License
 

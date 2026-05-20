@@ -13,7 +13,6 @@ tasks:
     desc: Drops a Snowflake external volume.
     cmds:
       - cmd/drop-external-volume.sh "{{.EXTERNAL_VOLUME_NAME}}"
-
   desc-external-volume:
     desc: Describes a Snowflake external volume and outputs storage location JSON.
     vars:
