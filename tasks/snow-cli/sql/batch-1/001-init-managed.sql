@@ -4,6 +4,7 @@
 -- UPDATE THESE VALUES:
 SET warehouse_name = '{{ demo_warehouse_name }}';             -- e.g., 'COMPUTE_WH'
 SET demo_database = '{{ demo_database_name }}';               -- e.g., 'DEMO_DB';
+SET demo_database_comment = '{{ demo_database_ddl_comment }}'; -- e.g., 'Iceberg V3 demo'
 SET demo_schema = '{{ demo_schema_name }}';                   -- e.g., 'RAW';
 SET demo_engineer_role = '{{ demo_engineer_role_name }}';     -- e.g., 'JOHN_DOE_DATA_ENGINEER'
 SET demo_engineer_user = '{{ demo_engineer_user_name }}';     -- e.g., 'JOHN_DOE
@@ -40,7 +41,8 @@ GRANT USAGE ON WAREHOUSE IDENTIFIER($WAREHOUSE_NAME) TO ROLE IDENTIFIER($DEMO_EN
 -- ========================================================================
 -- STEP 5: Create Database, Schemas, and grants on them
 -- ========================================================================
-CREATE DATABASE IF NOT EXISTS IDENTIFIER($DEMO_DATABASE);
+CREATE DATABASE IF NOT EXISTS IDENTIFIER($DEMO_DATABASE)
+    COMMENT = $DEMO_DATABASE_COMMENT;
 
 -- Use Snowflake Managed Storage — no external volume object required
 ALTER DATABASE IDENTIFIER($DEMO_DATABASE) SET EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED';

@@ -21,6 +21,7 @@ REQUIRED_VARS=(
     "DEMO_WAREHOUSE_NAME"
     "INTERNAL_NAMED_STAGE"
     "DEMO_DATABASE_NAME"
+    "DEMO_DATABASE_DDL_COMMENT"
     "DEMO_SCHEMA_NAME"
     "DEMO_ENGINEER_ROLE_NAME"
     "DEMO_ENGINEER_USER_NAME"
@@ -57,6 +58,7 @@ snow sql -f "$SQL_FILE" \
   --enable-templating JINJA \
   -D demo_warehouse_name="$DEMO_WAREHOUSE_NAME" \
   -D demo_database_name="$DEMO_DATABASE_NAME" \
+  -D demo_database_ddl_comment="$DEMO_DATABASE_DDL_COMMENT" \
   -D demo_schema_name="$DEMO_SCHEMA_NAME" \
   -D demo_stage_name="$STAGE_NAME" \
   -D demo_engineer_role_name="$DEMO_ENGINEER_ROLE_NAME" \

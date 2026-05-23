@@ -104,8 +104,8 @@ tasks:
     desc: Sets up infrastructure and deploys Snowflake notebook for Iceberg demo.
     cmds:
       - task: infrastructure-up
-      - task: snow-cli:generate-notebook
-      - task: snow-cli:deploy-notebook
+#      - task: snow-cli:generate-notebook
+#      - task: snow-cli:deploy-notebook
 
   demo-teardown:
     desc: Tears down AWS and Snowflake resources for Iceberg demo (routes by STORAGE_MODE).
