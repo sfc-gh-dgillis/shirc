@@ -1,0 +1,11 @@
+definition_version: 2
+env:
+  DEMO_WAREHOUSE_NAME: "set_via_shell_env_var"
+  DEMO_DATABASE_NAME: "set_via_shell_env_var"
+  DEMO_DATABASE_DDL_COMMENT: "set_via_shell_env_var"
+  DEMO_SCHEMA_NAME: "set_via_shell_env_var"
+  DEMO_INTERNAL_NAMED_STAGE: "set_via_shell_env_var"
+  DEMO_ENGINEER_ROLE_NAME: "set_via_shell_env_var"
+  DEMO_ENGINEER_USER_NAME: "set_via_shell_env_var"
+  DEMO_SETUP_USER: "UNRESOLVED_SETUP_USER"
+  EXTERNAL_VOLUME_NAME: "set_via_shell_env_var"

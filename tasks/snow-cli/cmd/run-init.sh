@@ -17,15 +17,16 @@ if [ ! -f "$SQL_FILE" ]; then
 fi
 
 # Check if required environment variables are set
+# These override the defaults in snowflake.yml via Snow CLI ctx.env resolution.
 REQUIRED_VARS=(
     "DEMO_WAREHOUSE_NAME"
-    "EXTERNAL_VOLUME_NAME"
-    "INTERNAL_NAMED_STAGE"
     "DEMO_DATABASE_NAME"
     "DEMO_DATABASE_DDL_COMMENT"
     "DEMO_SCHEMA_NAME"
+    "DEMO_INTERNAL_NAMED_STAGE"
     "DEMO_ENGINEER_ROLE_NAME"
     "DEMO_ENGINEER_USER_NAME"
+    "EXTERNAL_VOLUME_NAME"
 )
 
 MISSING_VARS=()
@@ -43,28 +44,27 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     exit 1
 fi
 
-# Strip leading "@" from INTERNAL_NAMED_STAGE if it exists
-STAGE_NAME="${INTERNAL_NAMED_STAGE#@}"
+# Resolve the authenticated Snowflake user dynamically
+DEMO_SETUP_USER=$(snow sql -q "SELECT CURRENT_USER()" --format JSON 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['CURRENT_USER()'])")
+
+if [ -z "$DEMO_SETUP_USER" ]; then
+    echo "Error: Could not resolve current Snowflake user"
+    exit 1
+fi
+export DEMO_SETUP_USER
 
 echo "Running Snowflake initialization script..."
 echo "  Warehouse: $DEMO_WAREHOUSE_NAME"
 echo "  External Volume: $EXTERNAL_VOLUME_NAME"
-echo "  Stage Name: $STAGE_NAME"
+echo "  Stage Name: $DEMO_INTERNAL_NAMED_STAGE"
 echo "  Engineer Role: $DEMO_ENGINEER_ROLE_NAME"
 echo "  Engineer User: $DEMO_ENGINEER_USER_NAME"
+echo "  Setup User: $DEMO_SETUP_USER (auto-detected)"
 echo ""
 
-# Run snow CLI with templating
-snow sql -f "$SQL_FILE" \
-  --enable-templating JINJA \
-  -D demo_warehouse_name="$DEMO_WAREHOUSE_NAME" \
-  -D your_external_volume_name="$EXTERNAL_VOLUME_NAME" \
-  -D demo_database_name="$DEMO_DATABASE_NAME" \
-  -D demo_database_ddl_comment="$DEMO_DATABASE_DDL_COMMENT" \
-  -D demo_schema_name="$DEMO_SCHEMA_NAME" \
-  -D demo_stage_name="$STAGE_NAME" \
-  -D demo_engineer_role_name="$DEMO_ENGINEER_ROLE_NAME" \
-  -D demo_engineer_user_name="$DEMO_ENGINEER_USER_NAME"
+# Run snow CLI — variables resolved via ctx.env from snowflake.yml + shell env overrides
+snow sql -f "$SQL_FILE"
 
 # Check if command was successful
 if [ $? -eq 0 ]; then
