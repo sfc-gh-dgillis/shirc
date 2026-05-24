@@ -82,7 +82,7 @@ task aws-cli:refresh-sso-token AWS_PROFILE=my-profile
 1. AWS resources: S3 bucket → IAM policy → IAM role → attach policy
 2. Snowflake resources: create external volume → describe it (saves Snowflake IAM user ARN to `output/`)
 3. Update AWS trust policy with the Snowflake IAM user ARN (cross-account access)
-4. Run Snowflake init SQL (`batch-1/001-init.sql`)
+4. Run Snowflake init SQL (`infra-up-external/002-init.sql`)
 5. Upload files to Snowflake internal named stage
 
 ### Output Files
@@ -112,8 +112,8 @@ tasks/
   snow-cli/
     snowcli-tasks.yml              # Snowflake CLI task definitions (runs from tasks/snow-cli/ dir)
     cmd/                           # Shell scripts for Snowflake operations
-    sql/batch-0/                   # DDL SQL templates (Jinja-style {{ }} variables)
-    sql/batch-1/001-init.sql       # Snowflake initialization (roles, DB, schema, stage)
+    sql/infra-up-external/         # SQL for external-storage infrastructure setup
+    sql/infra-up-managed/          # SQL for managed-storage infrastructure setup
     notebook/                      # Jupyter notebook template for Snowflake demo
     pyutil/snowcliput/             # Python utility for uploading files to Snowflake stages
     pyutil/snowclisp/              # Python utility (Snowflake stored procedures)

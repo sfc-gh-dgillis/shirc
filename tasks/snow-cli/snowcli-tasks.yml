@@ -3,11 +3,11 @@ version: '3'
 tasks:
 
   create-external-volume:
-    desc: Creates a Snowflake external volume using the Snow CLI with Jinja templating.
+    desc: Creates a Snowflake external volume using the Snow CLI.
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-0/create_external_volume.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "sql/infra-up-external/001-create_external_volume.sql"}}'
     cmds:
-      - cmd/create-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}"
+      - cmd/create-external-volume.sh "{{.SQL_FILE}}"
 
   drop-external-volume:
     desc: Drops a Snowflake external volume.
@@ -23,14 +23,14 @@ tasks:
   run-init:
     desc: Runs Snowflake initialization script (001-init.sql) with Jinja templating.
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-1/001-init.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "sql/infra-up-external/002-init.sql"}}'
     cmds:
       - cmd/run-init.sh "{{.SQL_FILE}}"
 
   run-init-managed:
     desc: Runs Snowflake init for managed storage mode (no external volume required).
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-1/001-init-managed.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "sql/infra-up-managed/001-init-managed.sql"}}'
     cmds:
       - cmd/run-init-managed.sh "{{.SQL_FILE}}"
 

@@ -409,9 +409,10 @@ shirc/
 |   |   |   +-- generate-notebook.sh  # Notebook generation
 |   |   |   +-- deploy-notebook.sh    # Notebook deployment
 |   |   +-- sql/
-|   |   |   +-- batch-0/              # External volume DDL
-|   |   |   +-- batch-1/
-|   |   |   |   +-- 001-init.sql              # Init SQL (external mode)
+|   |   |   +-- infra-up-external/      # SQL for external-storage infrastructure
+|   |   |   |   +-- 001-create_external_volume.sql  # External volume DDL
+|   |   |   |   +-- 002-init.sql                # Init SQL (external mode)
+|   |   |   +-- infra-up-managed/       # SQL for managed-storage infrastructure
 |   |   |   |   +-- 001-init-managed.sql      # Init SQL (managed mode)
 |   |   |   +-- batch-2/
 |   |   |       +-- 001-create-tables.sql     # Iceberg V3 feature tables

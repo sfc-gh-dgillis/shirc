@@ -9,3 +9,6 @@ env:
   DEMO_ENGINEER_USER_NAME: "set_via_shell_env_var"
   DEMO_SETUP_USER: "UNRESOLVED_SETUP_USER"
   EXTERNAL_VOLUME_NAME: "set_via_shell_env_var"
+  STORAGE_BASE_URL: "set_via_shell_env_var"
+  STORAGE_AWS_ROLE_ARN: "set_via_shell_env_var"
+  TRUST_POLICY_EXTERNAL_ID: "set_via_shell_env_var"

@@ -4,7 +4,7 @@ set -euo pipefail
 # Check if required arguments are provided
 if [ $# -lt 1 ]; then
     echo "Usage: $0 SQL_FILE"
-    echo "Example: $0 tasks/snow-cli/sql/batch-1/001-init.sql"
+    echo "Example: $0 sql/infra-up-external/002-init.sql"
     exit 1
 fi
 
