@@ -21,18 +21,11 @@ tasks:
       - cmd/desc-external-volume.sh "{{.EXTERNAL_VOLUME_NAME}}" "{{.OUTPUT_DIR}}"
 
   run-init:
-    desc: Runs Snowflake initialization script (001-init.sql) with Jinja templating.
+    desc: Runs unified Snowflake initialization script (conditionally handles managed/external storage).
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/infra-up-external/002-init.sql"}}'
+      SQL_DIR: '{{.SQL_DIR | default "sql"}}'
     cmds:
-      - cmd/run-init.sh "{{.SQL_FILE}}"
-
-  run-init-managed:
-    desc: Runs Snowflake init for managed storage mode (no external volume required).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/infra-up-managed/001-init-managed.sql"}}'
-    cmds:
-      - cmd/run-init-managed.sh "{{.SQL_FILE}}"
+      - cmd/run-init.sh "{{.SQL_DIR}}"
 
   upload-files-to-internal-named-stage:
     desc: Uploads all files from the given directory to a Snowflake Internal stage using the Snowflake CLI and PUT command.

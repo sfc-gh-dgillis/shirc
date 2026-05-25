@@ -1,33 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Check if required arguments are provided
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 SQL_FILE"
-    echo "Example: $0 sql/infra-up-external/002-init.sql"
+    echo "Usage: $0 SQL_DIR"
+    echo "Example: $0 sql"
     exit 1
 fi
 
-SQL_FILE="$1"
+SQL_DIR="$1"
+SQL_FILE="$SQL_DIR/init.sql"
 
-# Check if SQL file exists
+# Determine mode-specific SQL file
+if [ "${STORAGE_MODE:-managed}" = "external" ]; then
+    STORAGE_SQL_FILE="$SQL_DIR/init-storage-external.sql"
+else
+    STORAGE_SQL_FILE="$SQL_DIR/init-storage-managed.sql"
+fi
+
+# Check if SQL files exist
 if [ ! -f "$SQL_FILE" ]; then
     echo "Error: SQL file not found at $SQL_FILE"
+    exit 1
+fi
+if [ ! -f "$STORAGE_SQL_FILE" ]; then
+    echo "Error: Storage mode SQL file not found at $STORAGE_SQL_FILE"
     exit 1
 fi
 
 # Check if required environment variables are set
 # These override the defaults in snowflake.yml via Snow CLI ctx.env resolution.
 REQUIRED_VARS=(
+    "STORAGE_MODE"
     "DEMO_WAREHOUSE_NAME"
     "DEMO_DATABASE_NAME"
     "DEMO_DATABASE_DDL_COMMENT"
-    "DEMO_SCHEMA_NAME"
+    "DEMO_SCHEMA_NAME_BRONZE"
+    "DEMO_SCHEMA_NAME_SILVER"
+    "DEMO_SCHEMA_NAME_GOLD"
     "DEMO_INTERNAL_NAMED_STAGE"
     "DEMO_ENGINEER_ROLE_NAME"
     "DEMO_ENGINEER_USER_NAME"
-    "EXTERNAL_VOLUME_NAME"
 )
+
+# External mode requires additional vars
+if [ "$STORAGE_MODE" = "external" ]; then
+    REQUIRED_VARS+=("EXTERNAL_VOLUME_NAME")
+fi
 
 MISSING_VARS=()
 for VAR in "${REQUIRED_VARS[@]}"; do
@@ -54,27 +72,30 @@ if [ -z "$DEMO_SETUP_USER" ]; then
 fi
 export DEMO_SETUP_USER
 
-echo "Running Snowflake initialization script..."
-echo "  Warehouse: $DEMO_WAREHOUSE_NAME"
-echo "  External Volume: $EXTERNAL_VOLUME_NAME"
-echo "  Stage Name: $DEMO_INTERNAL_NAMED_STAGE"
+echo "Running Snowflake initialization..."
+echo "  Storage Mode:  $STORAGE_MODE"
+echo "  Warehouse:     $DEMO_WAREHOUSE_NAME"
+if [ "$STORAGE_MODE" = "external" ]; then
+echo "  Ext Volume:    $EXTERNAL_VOLUME_NAME"
+else
+echo "  Ext Volume:    SNOWFLAKE_MANAGED"
+fi
+echo "  Database:      $DEMO_DATABASE_NAME"
+echo "  Schemas:       $DEMO_SCHEMA_NAME_BRONZE / $DEMO_SCHEMA_NAME_SILVER / $DEMO_SCHEMA_NAME_GOLD"
+echo "  Stage:         $DEMO_INTERNAL_NAMED_STAGE"
 echo "  Engineer Role: $DEMO_ENGINEER_ROLE_NAME"
 echo "  Engineer User: $DEMO_ENGINEER_USER_NAME"
-echo "  Setup User: $DEMO_SETUP_USER (auto-detected)"
+echo "  Setup User:    $DEMO_SETUP_USER (auto-detected)"
 echo ""
 
-# Run snow CLI — variables resolved via ctx.env from snowflake.yml + shell env overrides
+# Run shared init (warehouse, roles, users, database, schemas, grants, stage)
+echo "==> Running: $SQL_FILE"
 snow sql -f "$SQL_FILE"
 
-# Check if command was successful
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "Initialization completed successfully"
-    echo "Database: $DEMO_DATABASE_NAME"
-    echo "Role: $DEMO_ENGINEER_ROLE_NAME"
-    echo "User: $DEMO_ENGINEER_USER_NAME"
-else
-    echo ""
-    echo "Initialization failed"
-    exit 1
-fi
+# Run mode-specific storage configuration
+echo ""
+echo "==> Running: $STORAGE_SQL_FILE"
+snow sql -f "$STORAGE_SQL_FILE"
+
+echo ""
+echo "Initialization completed successfully"

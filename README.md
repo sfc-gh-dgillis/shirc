@@ -187,8 +187,7 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 | `task snow-cli:create-external-volume`               | Create external volume only                                |
 | `task snow-cli:drop-external-volume`                 | Drop external volume only                                  |
 | `task snow-cli:desc-external-volume`                 | Describe external volume and save JSON                     |
-| `task snow-cli:run-init`                             | Run initialization SQL (external mode)                     |
-| `task snow-cli:run-init-managed`                     | Run initialization SQL (managed mode, no external volume)  |
+| `task snow-cli:run-init`                             | Run initialization SQL (handles both managed and external modes) |
 | `task snow-cli:upload-files-to-internal-named-stage` | Upload files to internal stage                             |
 | `task snow-cli:generate-notebook`                    | Generate notebook from template                            |
 | `task snow-cli:deploy-notebook`                      | Deploy notebook to Snowflake                               |
@@ -404,16 +403,13 @@ shirc/
 |   +-- snow-cli/
 |   |   +-- snowcli-tasks.yml         # Snowflake CLI task definitions
 |   |   +-- cmd/                      # Snowflake CLI scripts
-|   |   |   +-- run-init.sh           # Init script (external mode)
-|   |   |   +-- run-init-managed.sh   # Init script (managed mode)
+|   |   |   +-- run-init.sh           # Unified init script (handles both storage modes)
 |   |   |   +-- generate-notebook.sh  # Notebook generation
 |   |   |   +-- deploy-notebook.sh    # Notebook deployment
 |   |   +-- sql/
-|   |   |   +-- infra-up-external/      # SQL for external-storage infrastructure
+|   |   |   +-- infra-up-external/      # External volume DDL (external mode only)
 |   |   |   |   +-- 001-create_external_volume.sql  # External volume DDL
-|   |   |   |   +-- 002-init.sql                # Init SQL (external mode)
-|   |   |   +-- infra-up-managed/       # SQL for managed-storage infrastructure
-|   |   |   |   +-- 001-init-managed.sql      # Init SQL (managed mode)
+|   |   |   +-- init.sql                 # Unified init SQL (both storage modes)
 |   |   |   +-- batch-2/
 |   |   |       +-- 001-create-tables.sql     # Iceberg V3 feature tables
 |   |   |       +-- 002-load-data.sql         # Data loading
