@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 SQL_DIR"
-    echo "Example: $0 sql"
+    echo "Example: $0 sql/init"
     exit 1
 fi
 
@@ -12,9 +12,9 @@ SQL_FILE="$SQL_DIR/init.sql"
 
 # Determine mode-specific SQL file
 if [ "${STORAGE_MODE:-managed}" = "external" ]; then
-    STORAGE_SQL_FILE="$SQL_DIR/init-storage-external.sql"
+    STORAGE_SQL_FILE="$SQL_DIR/init_storage_external.sql"
 else
-    STORAGE_SQL_FILE="$SQL_DIR/init-storage-managed.sql"
+    STORAGE_SQL_FILE="$SQL_DIR/init_storage_managed.sql"
 fi
 
 # Check if SQL files exist

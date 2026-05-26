@@ -4,7 +4,7 @@ set -euo pipefail
 # Check if required arguments are provided
 if [ $# -lt 1 ]; then
     echo "Usage: $0 SQL_FILE"
-    echo "Example: $0 sql/infra-up-external/001-create_external_volume.sql"
+    echo "Example: $0 sql/init/create_external_volume.sql"
     exit 1
 fi
 

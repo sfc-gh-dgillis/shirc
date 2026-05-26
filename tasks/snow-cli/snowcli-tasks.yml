@@ -5,7 +5,7 @@ tasks:
   create-external-volume:
     desc: Creates a Snowflake external volume using the Snow CLI.
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/infra-up-external/001-create_external_volume.sql"}}'
+      SQL_FILE: '{{.SQL_FILE | default "sql/init/create_external_volume.sql"}}'
     cmds:
       - cmd/create-external-volume.sh "{{.SQL_FILE}}"
 
@@ -23,7 +23,7 @@ tasks:
   run-init:
     desc: Runs unified Snowflake initialization script (conditionally handles managed/external storage).
     vars:
-      SQL_DIR: '{{.SQL_DIR | default "sql"}}'
+      SQL_DIR: '{{.SQL_DIR | default "sql/init"}}'
     cmds:
       - cmd/run-init.sh "{{.SQL_DIR}}"
 
