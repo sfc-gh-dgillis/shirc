@@ -9,9 +9,9 @@ Environment variables used for substitution:
     - DEMO_WAREHOUSE_NAME
     - DEMO_ENGINEER_ROLE_NAME
     - DEMO_DATABASE_NAME
-    - DEMO_SCHEMA_NAME
+    - DEMO_SCHEMA_NAME_BRONZE
     - EXTERNAL_VOLUME_NAME
-    - INTERNAL_NAMED_STAGE
+    - DEMO_INTERNAL_NAMED_STAGE
 """
 
 import argparse
@@ -97,9 +97,9 @@ def main():
         "demo_warehouse_name": get_required_env("DEMO_WAREHOUSE_NAME"),
         "demo_engineer_role_name": get_required_env("DEMO_ENGINEER_ROLE_NAME"),
         "demo_database_name": get_required_env("DEMO_DATABASE_NAME"),
-        "demo_schema_name": get_required_env("DEMO_SCHEMA_NAME"),
+        "demo_schema_name": get_required_env("DEMO_SCHEMA_NAME_BRONZE"),
         "external_volume_name": get_required_env("EXTERNAL_VOLUME_NAME"),
-        "internal_named_stage": get_required_env("INTERNAL_NAMED_STAGE"),
+        "internal_named_stage": f"@{get_required_env('DEMO_DATABASE_NAME')}.{get_required_env('DEMO_SCHEMA_NAME_BRONZE')}.{get_required_env('DEMO_INTERNAL_NAMED_STAGE')}",
     }
 
     print("Generating notebook project from templates...")

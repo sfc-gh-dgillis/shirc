@@ -12,30 +12,14 @@ CREATE WAREHOUSE IF NOT EXISTS <% ctx.env.DEMO_WAREHOUSE_NAME %>
     COMMENT = 'Warehouse for Fleet Analytics Iceberg V3 Guide';
 
 -- ========================================================================
--- STEP 2: Create Demo Roles
+-- STEP 2: Create Roles
 -- ========================================================================
 CREATE ROLE IF NOT EXISTS <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
+CREATE ROLE IF NOT EXISTS <% ctx.env.DEMO_ANALYST_ROLE_NAME %>;
+CREATE ROLE IF NOT EXISTS <% ctx.env.DEMO_ADMIN_ROLE_NAME %>;
 
 -- ========================================================================
--- STEP 3: Users for each role, each user needs a Personal Access Token
--- ========================================================================
--- Service users (for PAT-based external access)
-CREATE USER IF NOT EXISTS <% ctx.env.DEMO_ENGINEER_USER_NAME %> LOGIN_NAME=<% ctx.env.DEMO_ENGINEER_USER_NAME %> TYPE='service';
-
--- Role assignments
-GRANT ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %> TO USER <% ctx.env.DEMO_SETUP_USER %>;
-GRANT ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %> TO USER <% ctx.env.DEMO_ENGINEER_USER_NAME %>;
-
--- Default roles (so PAT runs with the intended role)
-ALTER USER <% ctx.env.DEMO_ENGINEER_USER_NAME %> SET DEFAULT_ROLE = <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-
--- ========================================================================
--- STEP 4: Grant resource access to demo roles
--- ========================================================================
-GRANT USAGE ON WAREHOUSE <% ctx.env.DEMO_WAREHOUSE_NAME %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-
--- ========================================================================
--- STEP 5: Create Database and set Iceberg defaults
+-- STEP 3: Create Database and set Iceberg defaults
 -- ========================================================================
 CREATE DATABASE IF NOT EXISTS <% ctx.env.DEMO_DATABASE_NAME %>
     COMMENT = '<% ctx.env.DEMO_DATABASE_DDL_COMMENT %>';
@@ -45,13 +29,13 @@ CREATE DATABASE IF NOT EXISTS <% ctx.env.DEMO_DATABASE_NAME %>
 ALTER DATABASE <% ctx.env.DEMO_DATABASE_NAME %> SET ICEBERG_VERSION_DEFAULT = 3;
 
 -- NOTE: Storage mode (external volume or managed) is applied by a separate
--- mode-specific SQL file (init-storage-external.sql or init-storage-managed.sql)
+-- mode-specific SQL file (init_storage_external.sql or init_storage_managed.sql)
 -- run immediately after this script.
 
 USE DATABASE <% ctx.env.DEMO_DATABASE_NAME %>;
 
 -- ========================================================================
--- STEP 6: Create Medallion Schemas (Bronze / Silver / Gold)
+-- STEP 3: Create Medallion Schemas (Bronze / Silver / Gold)
 -- ========================================================================
 CREATE SCHEMA IF NOT EXISTS <% ctx.env.DEMO_SCHEMA_NAME_BRONZE %>
     COMMENT = 'Raw data layer - source Iceberg tables';
@@ -63,23 +47,7 @@ CREATE SCHEMA IF NOT EXISTS <% ctx.env.DEMO_SCHEMA_NAME_GOLD %>
     COMMENT = 'Analytics layer - aggregated Iceberg tables';
 
 -- ========================================================================
--- STEP 7: Grants on database and schemas
--- ========================================================================
-GRANT USAGE ON DATABASE <% ctx.env.DEMO_DATABASE_NAME %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-GRANT USAGE ON ALL SCHEMAS IN DATABASE <% ctx.env.DEMO_DATABASE_NAME %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-
--- Grant table creation rights on all medallion schemas
-GRANT CREATE ICEBERG TABLE ON SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_BRONZE %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-GRANT MONITOR ON SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_BRONZE %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-
-GRANT CREATE ICEBERG TABLE ON SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_SILVER %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-GRANT MONITOR ON SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_SILVER %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-
-GRANT CREATE ICEBERG TABLE ON SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_GOLD %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-GRANT MONITOR ON SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_GOLD %> TO ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %>;
-
--- ========================================================================
--- STEP 8: Create internal named stage (in bronze schema for raw file uploads)
+-- STEP 4: Create internal named stage (in bronze schema for raw file uploads)
 -- ========================================================================
 USE SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_BRONZE %>;
 
@@ -89,7 +57,7 @@ CREATE STAGE IF NOT EXISTS <% ctx.env.DEMO_INTERNAL_NAMED_STAGE %>
     COMMENT = '<% ctx.env.DEMO_INTERNAL_NAMED_STAGE_COMMENT %>';
 
 -- ========================================================================
--- STEP 9: Create file format for JSON ingestion
+-- STEP 5: Create file format for JSON ingestion
 -- ========================================================================
 CREATE FILE FORMAT IF NOT EXISTS <% ctx.env.DEMO_JSON_FILE_FORMAT %>
     TYPE = 'JSON'
@@ -97,7 +65,7 @@ CREATE FILE FORMAT IF NOT EXISTS <% ctx.env.DEMO_JSON_FILE_FORMAT %>
     COMMENT = '<% ctx.env.DEMO_JSON_FILE_FORMAT_COMMENT %>';
 
 -- ========================================================================
--- STEP 10: External Access Integration for API calls
+-- STEP 6: External Access Integration for API calls
 -- Required for Python code in notebooks to access external APIs
 -- ========================================================================
 CREATE OR REPLACE NETWORK RULE <% ctx.env.DEMO_DATABASE_NAME %>.<% ctx.env.DEMO_SCHEMA_NAME_BRONZE %>.<% ctx.env.DEMO_NETWORK_RULE_NAME %>

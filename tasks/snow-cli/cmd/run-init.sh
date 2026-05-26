@@ -39,7 +39,6 @@ REQUIRED_VARS=(
     "DEMO_SCHEMA_NAME_GOLD"
     "DEMO_INTERNAL_NAMED_STAGE"
     "DEMO_ENGINEER_ROLE_NAME"
-    "DEMO_ENGINEER_USER_NAME"
 )
 
 # External mode requires additional vars
@@ -84,7 +83,6 @@ echo "  Database:      $DEMO_DATABASE_NAME"
 echo "  Schemas:       $DEMO_SCHEMA_NAME_BRONZE / $DEMO_SCHEMA_NAME_SILVER / $DEMO_SCHEMA_NAME_GOLD"
 echo "  Stage:         $DEMO_INTERNAL_NAMED_STAGE"
 echo "  Engineer Role: $DEMO_ENGINEER_ROLE_NAME"
-echo "  Engineer User: $DEMO_ENGINEER_USER_NAME"
 echo "  Setup User:    $DEMO_SETUP_USER (auto-detected)"
 echo ""
 

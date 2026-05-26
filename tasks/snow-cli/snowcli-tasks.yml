@@ -2,6 +2,11 @@ version: '3'
 
 tasks:
 
+  sort-and-process-sql-folder:
+    desc: Sorts and processes all SQL files in the given directory. Sorts and executes SQL files with numeric prefixes (e.g., 001-schema.sql)
+    cmds:
+      - python3 pyutil/snowclisp/snowclisp.py "{{.SQL_SORT_PROCESS_DIR}}" "{{.CLI_CONNECTION_NAME}}" --prefix-file sql/whoami.sql
+
   create-external-volume:
     desc: Creates a Snowflake external volume using the Snow CLI.
     vars:
@@ -13,6 +18,7 @@ tasks:
     desc: Drops a Snowflake external volume.
     cmds:
       - cmd/drop-external-volume.sh "{{.EXTERNAL_VOLUME_NAME}}"
+
   desc-external-volume:
     desc: Describes a Snowflake external volume and outputs storage location JSON.
     vars:
@@ -31,7 +37,7 @@ tasks:
     desc: Uploads all files from the given directory to a Snowflake Internal stage using the Snowflake CLI and PUT command.
     vars:
       FILE_UPLOAD_DIR: '{{.FILE_UPLOAD_DIR | default "../../upload"}}'
-      INTERNAL_NAMED_STAGE: '{{.INTERNAL_NAMED_STAGE | default "@json_stage"}}'
+      INTERNAL_NAMED_STAGE: '@{{.DEMO_DATABASE_NAME | default ""}}.{{.DEMO_SCHEMA_NAME_BRONZE | default ""}}.{{.DEMO_INTERNAL_NAMED_STAGE | default ""}}'
     cmds:
       - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
 
