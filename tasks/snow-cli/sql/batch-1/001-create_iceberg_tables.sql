@@ -35,7 +35,7 @@ CREATE OR REPLACE ICEBERG TABLE MAINTENANCE_LOGS (
     LOG_DATA VARIANT NOT NULL,
     SOURCE_FILE STRING,
     INGESTED_AT TIMESTAMP_LTZ(6))
-    -- TODO - discuss with Scott
+    -- TODO - discuss with Scott - 3 things (1. external volume on create statement 2. 6 columns here vs 5 in copy into 3. file_format should be JSON_FORMAT in COPY INTO, not (TYPE = JSON))
     -- EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'
     CATALOG = 'SNOWFLAKE'
     COMMENT = 'Maintenance and diagnostic logs loaded from JSON files';

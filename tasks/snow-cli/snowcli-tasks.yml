@@ -41,60 +41,24 @@ tasks:
     cmds:
       - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
 
-  run-ddl:
-    desc: Runs a SQL batch file with Jinja templating (engineer role context).
-    cmds:
-      - cmd/run-ddl.sh "{{.SQL_FILE}}"
-
-  create-tables:
-    desc: Creates standalone Iceberg V3 feature-showcase tables (batch-2/001-create-tables.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/001-create-tables.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
-  load-data:
-    desc: Loads staged JSON data into batch-2 Iceberg V3 tables (batch-2/002-load-data.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/002-load-data.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
-  run-dml-demo:
-    desc: Runs DML demo showing deletion vectors and row lineage (batch-2/003-dml-demo.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/003-dml-demo.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
-  drop-tables:
-    desc: Drops Iceberg V3 demo tables (batch-2/teardown.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/teardown.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
   drop-database-if-exists:
     desc: Drops the specified Snowflake database if it exists using the Snowflake CLI.
     cmds:
       - snow sql --connection "{{.CLI_CONNECTION_NAME}}" --query "DROP DATABASE IF EXISTS {{.DEMO_DATABASE_NAME}};"
 
-  generate-notebook:
-    desc: Generates a Snowflake notebook from template by substituting environment variables.
+  generate-fleet-notebook:
+    desc: Generates fleet analytics notebook from template with variable substitution.
     vars:
-      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "notebook/iceberg_v3_template.ipynb"}}'
-      OUTPUT_FILE: '{{.OUTPUT_FILE | default "notebook/iceberg_v3_notebook/iceberg_v3_demo_notebook.ipynb"}}'
+      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "notebook/fleet_analytics_notebook/templates/fleet_analytics_template.ipynb"}}'
+      OUTPUT_FILE: '{{.OUTPUT_FILE | default "notebook/fleet_analytics_notebook/generated/fleet_analytics_notebook.ipynb"}}'
+      VARIABLES_FILE: '{{.VARIABLES_FILE | default "notebook/fleet_analytics_notebook/variables.json"}}'
     cmds:
-      - cmd/generate-notebook.sh "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}"
+      - cmd/generate-notebook-generic.sh "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}" "{{.VARIABLES_FILE}}"
 
   deploy-notebook:
     desc: Deploys a notebook to Snowflake using the Snow CLI.
     vars:
-      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/iceberg_v3_notebook"}}'
+      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/fleet_analytics_notebook"}}'
     cmds:
       - cmd/deploy-notebook.sh "{{.PROJECT_DIR}}"
 

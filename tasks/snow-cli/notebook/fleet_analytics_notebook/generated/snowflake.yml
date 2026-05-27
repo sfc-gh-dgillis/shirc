@@ -1,0 +1,13 @@
+definition_version: 2
+entities:
+  fleet_analytics_notebook:
+    type: notebook
+    query_warehouse: FLEET_ANALYTICS_WH
+    identifier:
+      name: fleet_analytics_notebook
+      database: FLEET_ANALYTICS_DB
+      schema: RAW
+    stage_path: FLEET_ANALYTICS_DB.RAW.LOGS_STAGE
+    notebook_file: notebook/fleet_analytics_notebook/generated/fleet_analytics_notebook.ipynb
+    artifacts:
+    - fleet_analytics_notebook.ipynb

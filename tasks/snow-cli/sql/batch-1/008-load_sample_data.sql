@@ -12,20 +12,21 @@ USE SCHEMA <% ctx.env.DEMO_SCHEMA_NAME_BRONZE %>;
 -- ============================================
 
 -- First, verify files are in the stage
-LIST @<% ctx.env.DEMO_INTERNAL_NAMED_STAGE %>;
+LIST @<% ctx.env.DEMO_DATABASE_NAME %>.<% ctx.env.DEMO_SCHEMA_NAME_BRONZE %>.<% ctx.env.DEMO_INTERNAL_NAMED_STAGE %>;
 
 -- Load JSON files into MAINTENANCE_LOGS table
-COPY INTO MAINTENANCE_LOGS (LOG_ID, VEHICLE_ID, LOG_TIMESTAMP, LOG_DATA, SOURCE_FILE)
+COPY INTO MAINTENANCE_LOGS (LOG_ID, VEHICLE_ID, LOG_TIMESTAMP, LOG_DATA, SOURCE_FILE, INGESTED_AT)
 FROM (
     SELECT
-        $1:log_id::VARCHAR,
-        $1:vehicle_id::VARCHAR,
-        $1:log_timestamp::TIMESTAMP_NTZ,
-        $1,
-        METADATA$FILENAME
-    FROM @<% ctx.env.DEMO_INTERNAL_NAMED_STAGE %>
+        $1:log_id::VARCHAR              as log_id,
+        $1:vehicle_id::VARCHAR          as vehicle_id,
+        $1:log_timestamp::TIMESTAMP_NTZ as log_timestamp,
+        $1                              as log_data,
+        METADATA$FILENAME               as source_file,
+        current_timestamp()             as ingested_at
+    FROM @<% ctx.env.DEMO_DATABASE_NAME %>.<% ctx.env.DEMO_SCHEMA_NAME_BRONZE %>.<% ctx.env.DEMO_INTERNAL_NAMED_STAGE %>
 )
-FILE_FORMAT = (TYPE = 'JSON')
+FILE_FORMAT = <% ctx.env.DEMO_JSON_FILE_FORMAT %>
 PATTERN = '.*maintenance_log.*\.json'
 ON_ERROR = 'CONTINUE';
 
