@@ -57,6 +57,14 @@
     "json_file_format": {
       "env": "DEMO_JSON_FILE_FORMAT",
       "default": "JSON_FORMAT"
+    },
+    "agent_name": {
+      "env": "DEMO_AGENT_NAME",
+      "default": "FLEET_ANALYTICS_AGENT"
+    },
+    "semantic_view_name": {
+      "env": "DEMO_SEMANTIC_VIEW_NAME",
+      "default": "FLEET_ANALYTICS_SV"
     }
   }
 }

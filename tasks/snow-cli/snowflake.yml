@@ -19,6 +19,8 @@ env:
   DEMO_ENGINEER_ROLE_NAME: "set_via_shell_env_var"
   DEMO_ANALYST_ROLE_NAME: "set_via_shell_env_var"
   DEMO_ADMIN_ROLE_NAME: "set_via_shell_env_var"
+  DEMO_SEMANTIC_VIEW_NAME: "set_via_shell_env_var"
+  DEMO_AGENT_NAME: "set_via_shell_env_var"
   DEMO_SETUP_USER: "UNRESOLVED_SETUP_USER"
   EXTERNAL_VOLUME_NAME: "set_via_shell_env_var"
   STORAGE_BASE_URL: "set_via_shell_env_var"
