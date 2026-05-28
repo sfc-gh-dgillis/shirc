@@ -4,15 +4,18 @@ tasks:
 
   awscli:
     desc: Validates that the AWS CLI is configured correctly by attempting to get the caller identity.
+    internal: true
     cmds:
       - ./tasks/validate-prerequisites/cmd/validate-awscli.sh
 
   snowcli:
     desc: Validates that Snowflake CLI is installed.
+    internal: true
     cmds:
       - ./tasks/validate-prerequisites/cmd/validate-snowcli.sh
 
   conda:
     desc: Validates that conda is installed.
+    internal: true
     cmds:
       - ./tasks/validate-prerequisites/cmd/validate-conda.sh

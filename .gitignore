@@ -88,4 +88,4 @@ output/*
 tasks/.prerequisites_validated
 
 # Generated notebook output (created by snow-cli:generate-notebook task)
-tasks/snow-cli/notebook/iceberg_v3_notebook/
+tasks/snow-cli/notebook/fleet_analytics_notebook/generated

@@ -4,6 +4,7 @@ tasks:
 
   create-conda-env:
     desc: Create conda environment with PySpark 4.1.1, Jupyter, and OpenJDK 21
+    internal: true
     cmds:
       - ./tasks/python/cmd/create-conda-env.sh {{.CONDA_ENV_NAME | default "iceberg-lab"}}
     preconditions:
@@ -12,10 +13,12 @@ tasks:
 
   remove-conda-env:
     desc: Remove conda environment
+    internal: true
     cmds:
       - ./tasks/python/cmd/remove-conda-env.sh {{.CONDA_ENV_NAME | default "iceberg-lab"}}
 
   run-jupyter:
     desc: Run Jupyter notebook in conda environment
+    internal: true
     cmds:
       - conda run -n {{.CONDA_ENV_NAME | default "iceberg-lab"}} jupyter notebook {{.SPARK_NOTEBOOK_PATH | default "tasks/python/notebook/horizon_v3_variant_spark.ipynb"}}

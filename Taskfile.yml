@@ -25,11 +25,12 @@ tasks:
         vars:
           SQL_SORT_PROCESS_DIR: sql/batch-1
           CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
-#      - task: snow-cli:generate-notebook
+      - task: snow-cli:generate-fleet-notebook
       - task: snow-cli:deploy-notebook
 
   infrastructure-up:
     desc: Sets up infrastructure for Iceberg demos (routes by STORAGE_MODE).
+    internal: true
     cmds:
       - task: infrastructure-up-{{.STORAGE_MODE | default "managed"}}
 
@@ -51,6 +52,7 @@ tasks:
 
   aws-resources-up:
     desc: Validates AWS CLI, creates S3 bucket, generates and creates IAM policy.
+    internal: true
     cmds:
       - task: validate-prerequisites:awscli
       - task: aws-cli:make-s3-bucket
@@ -72,6 +74,7 @@ tasks:
 
   aws-resources-teardown:
     desc: Deletes the IAM role, IAM policy, and S3 bucket.
+    internal: true
     cmds:
       - task: validate-prerequisites:awscli
       - task: aws-cli:detach-policy-from-role
@@ -84,6 +87,7 @@ tasks:
 
   snowflake-external-volume-up:
     desc: Validates Snowflake CLI, creates Snowflake external volume.
+    internal: true
     cmds:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:create-external-volume
@@ -93,6 +97,7 @@ tasks:
 
   snowflake-resources-teardown:
     desc: Drops the Snowflake external volume.
+    internal: true
     cmds:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:drop-database-if-exists
@@ -123,12 +128,20 @@ tasks:
 
   snowflake-resources-teardown-managed:
     desc: Drops Snowflake database only (no external volume in managed mode).
+    internal: true
     cmds:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:drop-database-if-exists
         vars:
           CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
           DEMO_DATABASE_NAME: $DEMO_DATABASE_NAME
+
+  stream-telemetry:
+    desc: Streams simulated vehicle telemetry into Iceberg V3 table via Snowpipe Streaming SDK.
+    cmds:
+      - task: snow-cli:stream-telemetry
+        vars:
+          EVENT_COUNT: '{{.EVENT_COUNT | default "100"}}'
 
   spark-demo-up:
     desc: Sets up infrastructure, Spark environment, and launches Jupyter
