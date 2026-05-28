@@ -20,7 +20,6 @@ fi
 # These override the defaults in snowflake.yml via Snow CLI ctx.env resolution.
 REQUIRED_VARS=(
     "EXTERNAL_VOLUME_NAME"
-    "S3_PREFIX"
     "TRUST_POLICY_EXTERNAL_ID"
 )
 

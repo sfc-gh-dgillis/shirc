@@ -4,7 +4,6 @@ env:
   DEMO_WAREHOUSE_NAME: "set_via_shell_env_var"
   DEMO_DATABASE_NAME: "set_via_shell_env_var"
   DEMO_DATABASE_DDL_COMMENT: "set_via_shell_env_var"
-  DEMO_SCHEMA_NAME: "set_via_shell_env_var"
   DEMO_SCHEMA_NAME_BRONZE: "set_via_shell_env_var"
   DEMO_SCHEMA_NAME_SILVER: "set_via_shell_env_var"
   DEMO_SCHEMA_NAME_GOLD: "set_via_shell_env_var"

@@ -12,9 +12,9 @@ Usage:
 Environment variables (required):
     CLI_CONNECTION_NAME  — Snow CLI connection name (resolves account/user/key from config.toml)
     DEMO_DATABASE_NAME   — Target database
-    DEMO_SCHEMA_NAME     — Target schema
+    DEMO_SCHEMA_NAME_BRONZE — Target schema (bronze layer)
 
-The target table is: <DEMO_DATABASE_NAME>.<DEMO_SCHEMA_NAME>.VEHICLE_TELEMETRY_STREAM
+The target table is: <DEMO_DATABASE_NAME>.<DEMO_SCHEMA_NAME_BRONZE>.VEHICLE_TELEMETRY_STREAM
 """
 
 import argparse
@@ -141,7 +141,7 @@ def main():
     # Read environment
     connection_name = os.environ.get("CLI_CONNECTION_NAME")
     database = os.environ.get("DEMO_DATABASE_NAME")
-    schema = os.environ.get("DEMO_SCHEMA_NAME")
+    schema = os.environ.get("DEMO_SCHEMA_NAME_BRONZE")
 
     if not connection_name:
         print("Error: CLI_CONNECTION_NAME environment variable not set", file=sys.stderr)
@@ -150,7 +150,7 @@ def main():
         print("Error: DEMO_DATABASE_NAME environment variable not set", file=sys.stderr)
         sys.exit(1)
     if not schema:
-        print("Error: DEMO_SCHEMA_NAME environment variable not set", file=sys.stderr)
+        print("Error: DEMO_SCHEMA_NAME_BRONZE environment variable not set", file=sys.stderr)
         sys.exit(1)
 
     # Resolve connection credentials from Snow CLI config
