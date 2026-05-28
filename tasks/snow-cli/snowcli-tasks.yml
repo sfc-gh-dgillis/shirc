@@ -67,7 +67,7 @@ tasks:
     desc: Deploys a notebook to Snowflake using the Snow CLI.
     internal: true
     vars:
-      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/fleet_analytics_notebook"}}'
+      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/fleet_analytics_notebook/generated"}}'
     cmds:
       - cmd/deploy-notebook.sh "{{.PROJECT_DIR}}"
 
