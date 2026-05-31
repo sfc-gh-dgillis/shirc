@@ -70,6 +70,9 @@ task snow-cli:drop-external-volume
 task snow-cli:generate-notebook
 task snow-cli:deploy-notebook
 
+# Optional troubleshooting (creates ingress network policy for the streaming script)
+task apply-network-policy
+
 # AWS SSO
 task aws-cli:refresh-sso-token AWS_PROFILE=my-profile
 ```
@@ -113,6 +116,7 @@ tasks/
     snowcli-tasks.yml              # Snowflake CLI task definitions (runs from tasks/snow-cli/ dir)
     cmd/                           # Shell scripts for Snowflake operations
     sql/init.sql                   # Unified init SQL (warehouse, roles, database, schemas, grants, stage)
+    sql/network_policy.sql         # Optional ingress NETWORK RULE + NETWORK POLICY (run via task apply-network-policy)
     sql/infra-up-external/         # External volume DDL (external storage mode only)
     notebook/                      # Jupyter notebook template for Snowflake demo
     pyutil/snowcliput/             # Python utility for uploading files to Snowflake stages

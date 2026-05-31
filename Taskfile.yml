@@ -143,6 +143,11 @@ tasks:
         vars:
           EVENT_COUNT: '{{.EVENT_COUNT | default "100"}}'
 
+  apply-network-policy:
+    desc: Optional troubleshooting - creates an INGRESS network rule + policy for the streaming script. Run only if connections fail.
+    cmds:
+      - task: snow-cli:apply-network-policy
+
   spark-demo-up:
     desc: Sets up infrastructure, Spark environment, and launches Jupyter
     cmds:

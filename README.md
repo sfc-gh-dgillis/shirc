@@ -157,6 +157,7 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 | `task demo-teardown`      | Teardown (routes by `STORAGE_MODE`)                                 |
 | `task spark-demo-up`      | Infrastructure + Spark/Jupyter environment                          |
 | `task spark-demo-teardown`| Teardown Spark environment + infrastructure                         |
+| `task apply-network-policy` | Optional - creates INGRESS network rule + policy for streaming (see Troubleshooting) |
 
 ### AWS Resource Tasks (external storage mode only)
 
@@ -496,6 +497,48 @@ All generated resource details are stored in the `output/` directory:
 | **Trust policy update fails**      | Ensure external volume is created first       |
 | **jq command not found**           | Install jq: `brew install jq`                 |
 | **Notebook deploy fails**          | Check snowflake.yml exists in project dir     |
+| **Streaming script can't connect** | See *Network Policy for streaming* below      |
+
+### Network Policy for streaming (optional)
+
+If `task stream-telemetry` cannot reach Snowflake (typical when an account
+network policy is already in place or you are on a restrictive corporate
+VPN), create an ingress network policy scoped to your current public IP:
+
+```bash
+task apply-network-policy
+```
+
+This runs `tasks/snow-cli/sql/network_policy.sql` which:
+
+1. Reads your current public IP via `CURRENT_IP_ADDRESS()`.
+2. Creates a `NETWORK RULE` (MODE=INGRESS, TYPE=IPV4) named
+   `$DEMO_INGRESS_NETWORK_RULE_NAME` containing only that IP.
+3. Creates a `NETWORK POLICY` named `$DEMO_NETWORK_POLICY_NAME` referencing
+   that rule.
+
+The script does **not** apply the policy. To bind it to your user, run
+manually after verifying the detected IP:
+
+```sql
+ALTER USER <your_username> SET NETWORK_POLICY = FLEET_STREAMING_POLICY;
+```
+
+> Warning: a wrong IP will lock you out of Snowflake. Always verify the
+> detected IP from the script's output before running the `ALTER USER`.
+
+Cleanup (manual):
+
+```sql
+ALTER USER <your_username> UNSET NETWORK_POLICY;
+DROP NETWORK POLICY IF EXISTS FLEET_STREAMING_POLICY;
+DROP NETWORK RULE IF EXISTS FLEET_ANALYTICS_DB.RAW.FLEET_STREAMING_NETWORK_RULE;
+```
+
+Note: this is distinct from the EGRESS network rule + EXTERNAL ACCESS
+INTEGRATION (`OPEN_METEO_ACCESS`) created by `task demo-up`. Those control
+*outbound* calls from in-Snowflake code; this one controls *inbound* client
+connections.
 
 ### Debug Mode
 

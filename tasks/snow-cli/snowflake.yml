@@ -16,6 +16,8 @@ env:
   DEMO_NETWORK_RULE_HOST: "set_via_shell_env_var"
   DEMO_EXTERNAL_ACCESS_INTEGRATION_NAME: "set_via_shell_env_var"
   DEMO_EXTERNAL_ACCESS_INTEGRATION_COMMENT: "set_via_shell_env_var"
+  DEMO_NETWORK_POLICY_NAME: "set_via_shell_env_var"
+  DEMO_INGRESS_NETWORK_RULE_NAME: "set_via_shell_env_var"
   DEMO_ENGINEER_ROLE_NAME: "set_via_shell_env_var"
   DEMO_ANALYST_ROLE_NAME: "set_via_shell_env_var"
   DEMO_ADMIN_ROLE_NAME: "set_via_shell_env_var"
