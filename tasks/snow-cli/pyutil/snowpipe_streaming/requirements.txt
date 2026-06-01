@@ -1,3 +1,5 @@
 snowpipe-streaming
+snowflake-connector-python
+requests
 cryptography
 tomli; python_version < "3.11"

@@ -2,6 +2,13 @@ version: '3'
 
 tasks:
 
+  create-uv-venv:
+    desc: Create a virtual environment named venv using uv
+    status:
+      - test -d "{{.ROOT_DIR}}/venv"
+    cmds:
+      - uv venv "{{.ROOT_DIR}}/venv"
+
   create-conda-env:
     desc: Create conda environment with PySpark 4.1.1, Jupyter, and OpenJDK 21
     internal: true
