@@ -4,16 +4,19 @@ tasks:
 
   make-s3-bucket:
     desc: Creates an s3 bucket.
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/make-bucket.sh "{{.S3_BUCKET_NAME}}" "{{.AWS_REGION}}"
 
   delete-s3-bucket:
     desc: Deletes an s3 bucket (must be empty).
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/delete-bucket.sh "{{.S3_BUCKET_NAME}}" "{{.FORCE}}"
 
   generate-iam-policy-for-s3-bucket-access:
     desc: Generates an IAM policy json document for accessing an s3 bucket from a template.
+    internal: true
     vars:
       TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "tasks/aws-cli/json/template/bucket-policy-template.json"}}'
       OUTPUT_FILE: '{{.OUTPUT_FILE | default "output/bucket-policy-output.json"}}'
@@ -22,6 +25,7 @@ tasks:
 
   create-iam-policy:
     desc: Creates an IAM policy from a JSON policy document and saves response to output/aws-output.json
+    internal: true
     vars:
       POLICY_DOCUMENT: '{{.POLICY_DOCUMENT | default "output/bucket-policy-output.json"}}'
     cmds:
@@ -29,11 +33,13 @@ tasks:
 
   delete-iam-policy:
     desc: Deletes an IAM policy (reads ARN from output/aws-output.json).
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/delete-iam-policy.sh
 
   generate-trust-policy:
     desc: Generates a trust policy document from a template using AWS account ID and external ID.
+    internal: true
     vars:
       TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "tasks/aws-cli/json/template/trust-policy-template.json"}}'
       OUTPUT_FILE: '{{.OUTPUT_FILE | default "output/trust-policy-output.json"}}'
@@ -42,6 +48,7 @@ tasks:
 
   create-iam-role:
     desc: Creates an IAM role with an external ID for cross-account access.
+    internal: true
     vars:
       TRUST_POLICY_DOCUMENT: '{{.TRUST_POLICY_DOCUMENT | default "output/trust-policy-output.json"}}'
     cmds:
@@ -49,30 +56,36 @@ tasks:
 
   attach-policy-to-role:
     desc: Attaches the IAM policy to the IAM role (reads ARNs from output/aws-output.json).
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/attach-policy-to-role.sh
 
   detach-policy-from-role:
     desc: Detaches the IAM policy from the IAM role (reads ARNs from output/aws-output.json).
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/detach-policy-from-role.sh
 
   delete-iam-role:
     desc: Deletes an IAM role (reads ARN from output/aws-output.json).
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/delete-iam-role.sh
 
   update-trust-policy-with-snowflake-user:
     desc: Updates the IAM role trust policy with Snowflake's IAM user ARN from external volume description.
+    internal: true
     cmds:
       - ./tasks/aws-cli/cmd/update-trust-policy-with-snowflake-user.sh
 
   refresh-sso-token:
     desc: Refreshes the AWS SSO token for the specified profile.
+    internal: true
     cmds:
       - aws sso login --profile "{{.AWS_PROFILE}}"
 
   list-profiles:
     desc: Lists all configured AWS profiles.
+    internal: true
     cmds:
       - aws configure list-profiles

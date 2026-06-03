@@ -6,7 +6,7 @@ set -euo pipefail
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 PROJECT_DIR"
-    echo "Example: $0 ../../output/iceberg_v3_notebook"
+    echo "Example: $0 ../../output/your_notebook_name"
     exit 1
 fi
 

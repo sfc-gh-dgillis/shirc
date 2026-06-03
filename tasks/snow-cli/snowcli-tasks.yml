@@ -2,93 +2,87 @@ version: '3'
 
 tasks:
 
-  create-external-volume:
-    desc: Creates a Snowflake external volume using the Snow CLI with Jinja templating.
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-0/create_external_volume.sql"}}'
+  sort-and-process-sql-folder:
+    desc: Sorts and processes all SQL files in the given directory. Sorts and executes SQL files with numeric prefixes (e.g., 001-schema.sql)
+    internal: true
     cmds:
-      - cmd/create-external-volume.sh "{{.SQL_FILE}}" "{{.EXTERNAL_VOLUME_NAME}}"
+      - python3 pyutil/snowclisp/snowclisp.py "{{.SQL_SORT_PROCESS_DIR}}" "{{.CLI_CONNECTION_NAME}}" --prefix-file sql/whoami.sql
+
+  create-external-volume:
+    desc: Creates a Snowflake external volume using the Snow CLI.
+    internal: true
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/init/create_external_volume.sql"}}'
+    cmds:
+      - cmd/create-external-volume.sh "{{.SQL_FILE}}"
 
   drop-external-volume:
     desc: Drops a Snowflake external volume.
+    internal: true
     cmds:
       - cmd/drop-external-volume.sh "{{.EXTERNAL_VOLUME_NAME}}"
 
   desc-external-volume:
     desc: Describes a Snowflake external volume and outputs storage location JSON.
+    internal: true
     vars:
       OUTPUT_DIR: '{{.OUTPUT_DIR | default "../../output"}}'
     cmds:
       - cmd/desc-external-volume.sh "{{.EXTERNAL_VOLUME_NAME}}" "{{.OUTPUT_DIR}}"
 
   run-init:
-    desc: Runs Snowflake initialization script (001-init.sql) with Jinja templating.
+    desc: Runs unified Snowflake initialization script (conditionally handles managed/external storage).
+    internal: true
     vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-1/001-init.sql"}}'
+      SQL_DIR: '{{.SQL_DIR | default "sql/init"}}'
     cmds:
-      - cmd/run-init.sh "{{.SQL_FILE}}"
+      - cmd/run-init.sh "{{.SQL_DIR}}"
 
   upload-files-to-internal-named-stage:
     desc: Uploads all files from the given directory to a Snowflake Internal stage using the Snowflake CLI and PUT command.
+    internal: true
     vars:
       FILE_UPLOAD_DIR: '{{.FILE_UPLOAD_DIR | default "../../upload"}}'
-      INTERNAL_NAMED_STAGE: '{{.INTERNAL_NAMED_STAGE | default "@json_stage"}}'
+      INTERNAL_NAMED_STAGE: '@{{.DEMO_DATABASE_NAME | default ""}}.{{.DEMO_SCHEMA_NAME_BRONZE | default ""}}.{{.DEMO_INTERNAL_NAMED_STAGE | default ""}}'
     cmds:
       - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
 
-  run-ddl:
-    desc: Runs a SQL batch file with Jinja templating (engineer role context).
-    cmds:
-      - cmd/run-ddl.sh "{{.SQL_FILE}}"
-
-  create-tables:
-    desc: Creates standalone Iceberg V3 feature-showcase tables (batch-2/001-create-tables.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/001-create-tables.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
-  load-data:
-    desc: Loads staged JSON data into batch-2 Iceberg V3 tables (batch-2/002-load-data.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/002-load-data.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
-  run-dml-demo:
-    desc: Runs DML demo showing deletion vectors and row lineage (batch-2/003-dml-demo.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/003-dml-demo.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
-  drop-tables:
-    desc: Drops Iceberg V3 demo tables (batch-2/teardown.sql).
-    vars:
-      SQL_FILE: '{{.SQL_FILE | default "sql/batch-2/teardown.sql"}}'
-    cmds:
-      - task: run-ddl
-        vars: {SQL_FILE: "{{.SQL_FILE}}"}
-
   drop-database-if-exists:
     desc: Drops the specified Snowflake database if it exists using the Snowflake CLI.
+    internal: true
     cmds:
       - snow sql --connection "{{.CLI_CONNECTION_NAME}}" --query "DROP DATABASE IF EXISTS {{.DEMO_DATABASE_NAME}};"
 
-  generate-notebook:
-    desc: Generates a Snowflake notebook from template by substituting environment variables.
+  generate-fleet-notebook:
+    desc: Generates fleet analytics notebook from template with variable substitution.
+    internal: true
     vars:
-      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "notebook/iceberg_v3_template.ipynb"}}'
-      OUTPUT_FILE: '{{.OUTPUT_FILE | default "notebook/iceberg_v3_notebook/iceberg_v3_demo_notebook.ipynb"}}'
+      TEMPLATE_FILE: '{{.TEMPLATE_FILE | default "notebook/fleet_analytics_notebook/templates/fleet_analytics_template.ipynb"}}'
+      OUTPUT_FILE: '{{.OUTPUT_FILE | default "notebook/fleet_analytics_notebook/generated/fleet_analytics_notebook.ipynb"}}'
+      VARIABLES_FILE: '{{.VARIABLES_FILE | default "notebook/fleet_analytics_notebook/variables.json"}}'
     cmds:
-      - cmd/generate-notebook.sh "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}"
+      - cmd/generate-notebook-generic.sh "{{.TEMPLATE_FILE}}" "{{.OUTPUT_FILE}}" "{{.VARIABLES_FILE}}"
 
   deploy-notebook:
     desc: Deploys a notebook to Snowflake using the Snow CLI.
+    internal: true
     vars:
-      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/iceberg_v3_notebook"}}'
+      PROJECT_DIR: '{{.PROJECT_DIR | default "notebook/fleet_analytics_notebook/generated"}}'
     cmds:
       - cmd/deploy-notebook.sh "{{.PROJECT_DIR}}"
+
+  stream-telemetry:
+    desc: Streams simulated vehicle telemetry into Iceberg V3 table via Snowpipe Streaming SDK.
+    internal: true
+    vars:
+      EVENT_COUNT: '{{.EVENT_COUNT | default "100"}}'
+    cmds:
+      - cmd/stream-telemetry.sh {{.EVENT_COUNT}}
+
+  apply-network-policy:
+    desc: Creates an INGRESS network rule (current IP) and a network policy (run only if streaming connections fail).
+    internal: true
+    vars:
+      SQL_FILE: '{{.SQL_FILE | default "sql/network_policy.sql"}}'
+    cmds:
+      - snow sql -f "{{.SQL_FILE}}"

@@ -1,0 +1,70 @@
+{
+  "description": "Variable mapping for fleet_analytics_notebook template generation. Each variable maps a Jinja placeholder to an environment variable (with fallback default).",
+  "snowflake_yml_template": "templates/fleet_analytics_snowflake_yml_template.yml",
+  "variables": {
+    "database_name": {
+      "env": "DEMO_DATABASE_NAME",
+      "default": "FLEET_ANALYTICS_DB"
+    },
+    "warehouse_name": {
+      "env": "DEMO_WAREHOUSE_NAME",
+      "default": "FLEET_ANALYTICS_WH"
+    },
+    "external_volume_name": {
+      "env": "EXTERNAL_VOLUME_NAME",
+      "default": "FLEET_ICEBERG_VOL"
+    },
+    "analyst_role_name": {
+      "env": "DEMO_ANALYST_ROLE_NAME",
+      "default": "FLEET_ANALYST"
+    },
+    "engineer_role_name": {
+      "env": "DEMO_ENGINEER_ROLE_NAME",
+      "default": "FLEET_ENGINEER"
+    },
+    "admin_role_name": {
+      "env": "DEMO_ADMIN_ROLE_NAME",
+      "default": "FLEET_ADMIN"
+    },
+    "external_access_integration_name": {
+      "env": "DEMO_EXTERNAL_ACCESS_INTEGRATION_NAME",
+      "default": "OPEN_METEO_ACCESS"
+    },
+    "logs_stage_name": {
+      "env": "DEMO_INTERNAL_NAMED_STAGE",
+      "default": "LOGS_STAGE"
+    },
+    "replication_group_name": {
+      "env": "DEMO_REPLICATION_GROUP_NAME",
+      "default": "FLEET_ANALYTICS_REPLICATION"
+    },
+    "network_policy_name": {
+      "env": "DEMO_NETWORK_POLICY_NAME",
+      "default": "FLEET_STREAMING_POLICY"
+    },
+    "schema_bronze": {
+      "env": "DEMO_SCHEMA_NAME_BRONZE",
+      "default": "RAW"
+    },
+    "schema_silver": {
+      "env": "DEMO_SCHEMA_NAME_SILVER",
+      "default": "CURATED"
+    },
+    "schema_gold": {
+      "env": "DEMO_SCHEMA_NAME_GOLD",
+      "default": "ANALYTICS"
+    },
+    "json_file_format": {
+      "env": "DEMO_JSON_FILE_FORMAT",
+      "default": "JSON_FORMAT"
+    },
+    "agent_name": {
+      "env": "DEMO_AGENT_NAME",
+      "default": "FLEET_ANALYTICS_AGENT"
+    },
+    "semantic_view_name": {
+      "env": "DEMO_SEMANTIC_VIEW_NAME",
+      "default": "FLEET_ANALYTICS_SV"
+    }
+  }
+}

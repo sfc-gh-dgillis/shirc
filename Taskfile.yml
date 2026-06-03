@@ -16,8 +16,43 @@ dotenv: ['{{ .ENV_DIR }}/{{ .DOTENV_FILENAME | default "iceberg.env" }}']
 
 tasks:
 
+  demo-up:
+    desc: Sets up infrastructure and deploys Snowflake notebook for Iceberg demo.
+    cmds:
+      - task: infrastructure-up
+      - task: snow-cli:upload-files-to-internal-named-stage
+      - task: snow-cli:sort-and-process-sql-folder
+        vars:
+          SQL_SORT_PROCESS_DIR: sql/batch-1
+          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
+      - task: snow-cli:generate-fleet-notebook
+      - task: snow-cli:deploy-notebook
+
+  infrastructure-up:
+    desc: Sets up infrastructure for Iceberg demos (routes by STORAGE_MODE).
+    internal: true
+    cmds:
+      - task: infrastructure-up-{{.STORAGE_MODE | default "managed"}}
+
+  infrastructure-up-external:
+    desc: Sets up AWS + Snowflake infrastructure (external S3 storage).
+    internal: true
+    cmds:
+      - task: aws-resources-up
+      - task: snowflake-external-volume-up
+      - task: aws-cli:update-trust-policy-with-snowflake-user
+      - task: snow-cli:run-init
+
+  infrastructure-up-managed:
+    desc: Sets up Snowflake-only infrastructure (Snowflake Managed Storage).
+    internal: true
+    cmds:
+      - task: validate-prerequisites:snowcli
+      - task: snow-cli:run-init
+
   aws-resources-up:
     desc: Validates AWS CLI, creates S3 bucket, generates and creates IAM policy.
+    internal: true
     cmds:
       - task: validate-prerequisites:awscli
       - task: aws-cli:make-s3-bucket
@@ -39,6 +74,7 @@ tasks:
 
   aws-resources-teardown:
     desc: Deletes the IAM role, IAM policy, and S3 bucket.
+    internal: true
     cmds:
       - task: validate-prerequisites:awscli
       - task: aws-cli:detach-policy-from-role
@@ -49,53 +85,68 @@ tasks:
           S3_BUCKET_NAME: $S3_BUCKET_NAME
           FORCE: --force
 
-  snowflake-resources-up:
+  snowflake-external-volume-up:
     desc: Validates Snowflake CLI, creates Snowflake external volume.
+    internal: true
     cmds:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:create-external-volume
-        vars:
-          EXTERNAL_VOLUME_NAME: $EXTERNAL_VOLUME_NAME
-          S3_PREFIX: $S3_PREFIX
       - task: snow-cli:desc-external-volume
         vars:
           EXTERNAL_VOLUME_NAME: $EXTERNAL_VOLUME_NAME
 
   snowflake-resources-teardown:
     desc: Drops the Snowflake external volume.
+    internal: true
     cmds:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:drop-database-if-exists
         vars:
           CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
-          DATABASE_NAME: $DATABASE_NAME
+          DEMO_DATABASE_NAME: $DEMO_DATABASE_NAME
       - task: snow-cli:drop-external-volume
         vars:
           EXTERNAL_VOLUME_NAME: $EXTERNAL_VOLUME_NAME
 
-  infrastructure-up:
-    desc: Sets up AWS and Snowflake infrastructure for Iceberg demos.
-    cmds:
-      - task: aws-resources-up
-      - task: snowflake-resources-up
-      - task: aws-cli:update-trust-policy-with-snowflake-user
-      - task: snow-cli:run-init
-      - task: snow-cli:upload-files-to-internal-named-stage
-        vars:
-          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
-
-  demo-up:
-    desc: Sets up infrastructure and deploys Snowflake notebook for Iceberg demo.
-    cmds:
-      - task: infrastructure-up
-      - task: snow-cli:generate-notebook
-      - task: snow-cli:deploy-notebook
-
   demo-teardown:
-    desc: Tears down AWS and Snowflake resources for Iceberg demo.
+    desc: Tears down AWS and Snowflake resources for Iceberg demo (routes by STORAGE_MODE).
+    cmds:
+      - task: demo-teardown-{{.STORAGE_MODE | default "managed"}}
+
+  demo-teardown-external:
+    desc: Tears down both Snowflake and AWS resources (external storage).
+    internal: true
     cmds:
       - task: snowflake-resources-teardown
       - task: aws-resources-teardown
+
+  demo-teardown-managed:
+    desc: Tears down Snowflake resources only (managed storage, no AWS to clean up).
+    internal: true
+    cmds:
+      - task: snowflake-resources-teardown-managed
+
+  snowflake-resources-teardown-managed:
+    desc: Drops Snowflake database only (no external volume in managed mode).
+    internal: true
+    cmds:
+      - task: validate-prerequisites:snowcli
+      - task: snow-cli:drop-database-if-exists
+        vars:
+          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
+          DEMO_DATABASE_NAME: $DEMO_DATABASE_NAME
+
+  stream-telemetry:
+    desc: Streams simulated vehicle telemetry into Iceberg V3 table via Snowpipe Streaming SDK.
+    cmds:
+      - task: snow-cli:stream-telemetry
+        vars:
+          EVENT_COUNT: '{{.EVENT_COUNT | default "100"}}'
+
+  apply-network-policy:
+    desc: Optional troubleshooting - creates an INGRESS network rule + policy for the streaming script. Run only if connections fail.
+    cmds:
+      - task: snow-cli:apply-network-policy
 
   spark-demo-up:
     desc: Sets up infrastructure, Spark environment, and launches Jupyter
@@ -109,5 +160,4 @@ tasks:
     desc: Tears down Spark environment and infrastructure.
     cmds:
       - task: python-tasks:remove-conda-env
-      - task: snowflake-resources-teardown
-      - task: aws-resources-teardown
+      - task: demo-teardown

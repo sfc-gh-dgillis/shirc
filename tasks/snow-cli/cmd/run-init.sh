@@ -1,31 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Check if required arguments are provided
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 SQL_FILE"
-    echo "Example: $0 tasks/snow-cli/sql/batch-1/001-init.sql"
+    echo "Usage: $0 SQL_DIR"
+    echo "Example: $0 sql/init"
     exit 1
 fi
 
-SQL_FILE="$1"
+SQL_DIR="$1"
+SQL_FILE="$SQL_DIR/init.sql"
 
-# Check if SQL file exists
+# Determine mode-specific SQL file
+if [ "${STORAGE_MODE:-managed}" = "external" ]; then
+    STORAGE_SQL_FILE="$SQL_DIR/init_storage_external.sql"
+else
+    STORAGE_SQL_FILE="$SQL_DIR/init_storage_managed.sql"
+fi
+
+# Check if SQL files exist
 if [ ! -f "$SQL_FILE" ]; then
     echo "Error: SQL file not found at $SQL_FILE"
     exit 1
 fi
+if [ ! -f "$STORAGE_SQL_FILE" ]; then
+    echo "Error: Storage mode SQL file not found at $STORAGE_SQL_FILE"
+    exit 1
+fi
 
 # Check if required environment variables are set
+# These override the defaults in snowflake.yml via Snow CLI ctx.env resolution.
 REQUIRED_VARS=(
+    "STORAGE_MODE"
     "DEMO_WAREHOUSE_NAME"
-    "EXTERNAL_VOLUME_NAME"
-    "INTERNAL_NAMED_STAGE"
     "DEMO_DATABASE_NAME"
-    "DEMO_SCHEMA_NAME"
+    "DEMO_DATABASE_DDL_COMMENT"
+    "DEMO_SCHEMA_NAME_BRONZE"
+    "DEMO_SCHEMA_NAME_SILVER"
+    "DEMO_SCHEMA_NAME_GOLD"
+    "DEMO_INTERNAL_NAMED_STAGE"
     "DEMO_ENGINEER_ROLE_NAME"
-    "DEMO_ENGINEER_USER_NAME"
 )
+
+# External mode requires additional vars
+if [ "$STORAGE_MODE" = "external" ]; then
+    REQUIRED_VARS+=("EXTERNAL_VOLUME_NAME")
+fi
 
 MISSING_VARS=()
 for VAR in "${REQUIRED_VARS[@]}"; do
@@ -42,37 +61,39 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     exit 1
 fi
 
-# Strip leading "@" from INTERNAL_NAMED_STAGE if it exists
-STAGE_NAME="${INTERNAL_NAMED_STAGE#@}"
+# Resolve the authenticated Snowflake user dynamically
+DEMO_SETUP_USER=$(snow sql -q "SELECT CURRENT_USER()" --format JSON 2>/dev/null \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['CURRENT_USER()'])")
 
-echo "Running Snowflake initialization script..."
-echo "  Warehouse: $DEMO_WAREHOUSE_NAME"
-echo "  External Volume: $EXTERNAL_VOLUME_NAME"
-echo "  Stage Name: $STAGE_NAME"
-echo "  Engineer Role: $DEMO_ENGINEER_ROLE_NAME"
-echo "  Engineer User: $DEMO_ENGINEER_USER_NAME"
-echo ""
-
-# Run snow CLI with templating
-snow sql -f "$SQL_FILE" \
-  --enable-templating JINJA \
-  -D demo_warehouse_name="$DEMO_WAREHOUSE_NAME" \
-  -D your_external_volume_name="$EXTERNAL_VOLUME_NAME" \
-  -D demo_database_name="$DEMO_DATABASE_NAME" \
-  -D demo_schema_name="$DEMO_SCHEMA_NAME" \
-  -D demo_stage_name="$STAGE_NAME" \
-  -D demo_engineer_role_name="$DEMO_ENGINEER_ROLE_NAME" \
-  -D demo_engineer_user_name="$DEMO_ENGINEER_USER_NAME"
-
-# Check if command was successful
-if [ $? -eq 0 ]; then
-    echo ""
-    echo "Initialization completed successfully"
-    echo "Database: $DEMO_DATABASE_NAME"
-    echo "Role: $DEMO_ENGINEER_ROLE_NAME"
-    echo "User: $DEMO_ENGINEER_USER_NAME"
-else
-    echo ""
-    echo "Initialization failed"
+if [ -z "$DEMO_SETUP_USER" ]; then
+    echo "Error: Could not resolve current Snowflake user"
     exit 1
 fi
+export DEMO_SETUP_USER
+
+echo "Running Snowflake initialization..."
+echo "  Storage Mode:  $STORAGE_MODE"
+echo "  Warehouse:     $DEMO_WAREHOUSE_NAME"
+if [ "$STORAGE_MODE" = "external" ]; then
+echo "  Ext Volume:    $EXTERNAL_VOLUME_NAME"
+else
+echo "  Ext Volume:    SNOWFLAKE_MANAGED"
+fi
+echo "  Database:      $DEMO_DATABASE_NAME"
+echo "  Schemas:       $DEMO_SCHEMA_NAME_BRONZE / $DEMO_SCHEMA_NAME_SILVER / $DEMO_SCHEMA_NAME_GOLD"
+echo "  Stage:         $DEMO_INTERNAL_NAMED_STAGE"
+echo "  Engineer Role: $DEMO_ENGINEER_ROLE_NAME"
+echo "  Setup User:    $DEMO_SETUP_USER (auto-detected)"
+echo ""
+
+# Run shared init (warehouse, roles, users, database, schemas, grants, stage)
+echo "==> Running: $SQL_FILE"
+snow sql -f "$SQL_FILE"
+
+# Run mode-specific storage configuration
+echo ""
+echo "==> Running: $STORAGE_SQL_FILE"
+snow sql -f "$STORAGE_SQL_FILE"
+
+echo ""
+echo "Initialization completed successfully"

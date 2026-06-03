@@ -1,0 +1,13 @@
+definition_version: 2
+entities:
+  fleet_analytics_notebook:
+    type: notebook
+    query_warehouse: {{ warehouse_name }}
+    identifier:
+      name: fleet_analytics_notebook
+      database: {{ database_name }}
+      schema: {{ schema_bronze }}
+    stage_path: {{ database_name }}.{{ schema_bronze }}.{{ logs_stage_name }}
+    notebook_file: {{ notebook_file_path }}
+    artifacts:
+    - {{ notebook_file }}

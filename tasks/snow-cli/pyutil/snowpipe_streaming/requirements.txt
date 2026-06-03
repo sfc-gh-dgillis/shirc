@@ -1,0 +1,4 @@
+snowpipe-streaming
+requests
+cryptography
+tomli; python_version < "3.11"

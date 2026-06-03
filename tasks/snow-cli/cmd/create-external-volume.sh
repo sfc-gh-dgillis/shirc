@@ -3,17 +3,38 @@ set -euo pipefail
 
 # Check if required arguments are provided
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 SQL_FILE EXTERNAL_VOLUME_NAME"
-    echo "Example: $0 tasks/snow-cli/batch-0/external_volume.sql iceberg_ext_vol"
+    echo "Usage: $0 SQL_FILE"
+    echo "Example: $0 sql/init/create_external_volume.sql"
     exit 1
 fi
 
 SQL_FILE="$1"
-EXTERNAL_VOLUME_NAME="${2:-}"
 
 # Check if SQL file exists
 if [ ! -f "$SQL_FILE" ]; then
     echo "Error: SQL file not found at $SQL_FILE"
+    exit 1
+fi
+
+# Check if required environment variables are set
+# These override the defaults in snowflake.yml via Snow CLI ctx.env resolution.
+REQUIRED_VARS=(
+    "EXTERNAL_VOLUME_NAME"
+    "TRUST_POLICY_EXTERNAL_ID"
+)
+
+MISSING_VARS=()
+for VAR in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!VAR:-}" ]; then
+        MISSING_VARS+=("$VAR")
+    fi
+done
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+    echo "Error: Missing required environment variables:"
+    for VAR in "${MISSING_VARS[@]}"; do
+        echo "  - $VAR"
+    done
     exit 1
 fi
 
@@ -28,11 +49,11 @@ if [ ! -f "$JSON_FILE" ]; then
 fi
 
 # Extract IAM role ARN from aws-output.json
-IAM_ROLE_ARN=$(jq -r '.iam_role.Role.Arn // empty' "$JSON_FILE")
+STORAGE_AWS_ROLE_ARN=$(jq -r '.iam_role.Role.Arn // empty' "$JSON_FILE")
 BUCKET_URI=$(jq -r '.bucket_uri // empty' "$JSON_FILE")
 
 # Check if values were extracted
-if [ -z "$IAM_ROLE_ARN" ] || [ "$IAM_ROLE_ARN" = "null" ]; then
+if [ -z "$STORAGE_AWS_ROLE_ARN" ] || [ "$STORAGE_AWS_ROLE_ARN" = "null" ]; then
     echo "Error: No IAM role ARN found in $JSON_FILE"
     exit 1
 fi
@@ -49,32 +70,19 @@ else
     STORAGE_BASE_URL="${BUCKET_URI}/"
 fi
 
-# Check if TRUST_POLICY_EXTERNAL_ID is set
-if [ -z "${TRUST_POLICY_EXTERNAL_ID:-}" ]; then
-    echo "Error: TRUST_POLICY_EXTERNAL_ID environment variable not set"
-    exit 1
-fi
-
-# Check if EXTERNAL_VOLUME_NAME is set
-if [ -z "$EXTERNAL_VOLUME_NAME" ]; then
-    echo "Error: EXTERNAL_VOLUME_NAME not provided"
-    exit 1
-fi
+# Export derived values so Snow CLI can resolve them via ctx.env
+export STORAGE_BASE_URL
+export STORAGE_AWS_ROLE_ARN
 
 echo "Creating Snowflake external volume..."
 echo "  External Volume Name: $EXTERNAL_VOLUME_NAME"
 echo "  Storage Base URL: $STORAGE_BASE_URL"
-echo "  IAM Role ARN: $IAM_ROLE_ARN"
+echo "  IAM Role ARN: $STORAGE_AWS_ROLE_ARN"
 echo "  External ID: $TRUST_POLICY_EXTERNAL_ID"
 echo ""
 
-# Run snow CLI with templating
-snow sql -f "$SQL_FILE" \
-  --enable-templating JINJA \
-  -D external_volume_name="$EXTERNAL_VOLUME_NAME" \
-  -D storage_base_url="$STORAGE_BASE_URL" \
-  -D storage_aws_role_arn="$IAM_ROLE_ARN" \
-  -D storage_aws_external_id="$TRUST_POLICY_EXTERNAL_ID"
+# Run snow CLI — variables resolved via ctx.env from snowflake.yml + shell env overrides
+snow sql -f "$SQL_FILE"
 
 # Check if creation was successful
 if [ $? -eq 0 ]; then
