@@ -128,3 +128,16 @@ CREATE OR REPLACE ICEBERG TABLE API_WEATHER_DATA (
     -- EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'
     CATALOG = 'SNOWFLAKE'
     COMMENT = 'Weather data fetched from Open-Meteo API';
+
+-- ============================================
+-- Snowpipe Streaming default pipe
+--
+-- The Python SDK in pyutil/snowpipe_streaming/ uses the default pipe
+-- naming convention <TABLE_NAME>-STREAMING (auto-created on first
+-- channel open). No explicit CREATE PIPE is required for the
+-- VEHICLE_TELEMETRY_STREAM table -- when stream_telemetry.py opens a
+-- channel against pipe "VEHICLE_TELEMETRY_STREAM-STREAMING" Snowflake
+-- materializes it on demand.
+--
+-- See: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-pipe-object
+-- ============================================

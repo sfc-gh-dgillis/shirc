@@ -9,21 +9,6 @@ tasks:
     cmds:
       - uv venv "{{.ROOT_DIR}}/venv"
 
-  create-conda-env:
-    desc: Create conda environment with PySpark 4.1.1, Jupyter, and OpenJDK 21
-    internal: true
-    cmds:
-      - ./tasks/python/cmd/create-conda-env.sh {{.CONDA_ENV_NAME | default "iceberg-lab"}}
-    preconditions:
-      - sh: test -f environment.yml
-        msg: "environment.yml not found in project root"
-
-  remove-conda-env:
-    desc: Remove conda environment
-    internal: true
-    cmds:
-      - ./tasks/python/cmd/remove-conda-env.sh {{.CONDA_ENV_NAME | default "iceberg-lab"}}
-
   run-jupyter:
     desc: Run Jupyter notebook in conda environment
     internal: true

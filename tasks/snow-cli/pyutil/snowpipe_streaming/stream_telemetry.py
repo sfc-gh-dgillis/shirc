@@ -1,86 +1,133 @@
 #!/usr/bin/env python3
-"""
-Snowflake Iceberg V3 Comprehensive Guide
-Streaming Telemetry Simulator using Snowpipe Streaming SDK
+"""Streaming telemetry simulator for the shirc Iceberg V3 demo.
 
-This script simulates real-time vehicle telemetry data and streams it
-directly into an Iceberg V3 table using Snowpipe Streaming.
+What it does
+------------
+Simulates a fleet of vehicles emitting telemetry (GPS, engine metrics,
+diagnostic codes, driver-behavior counters) and inserts each event as a
+VARIANT payload into the Iceberg V3 table
+``<DEMO_DATABASE_NAME>.<DEMO_SCHEMA_NAME_BRONZE>.VEHICLE_TELEMETRY_STREAM``.
+
+Why a simulator
+---------------
+A real fleet would publish telemetry to an MQTT/IoT broker (AWS IoT Core,
+Azure IoT Hub, HiveMQ, EMQX, ...). To keep the demo self-contained we
+generate the events locally and ship them straight to Snowflake. The
+``send_external_lineage`` helper still posts an OpenLineage event so
+Snowsight's Lineage view shows the (fictional) broker as an upstream node.
+
+How it's invoked
+----------------
+This script is normally launched by go-task::
+
+    task stream-telemetry              # streams ~600 events (5-min cap)
+    task stream-telemetry EVENT_COUNT=100   # exits after 100 events
+
+Task exports ``.env/iceberg.env`` into the subprocess, so all
+``DEMO_*`` and ``CLI_CONNECTION_NAME`` variables are available via
+``os.getenv``. The ``--events N`` CLI flag (added by ``main()``) overrides
+the default duration-based stop condition.
+
+Connection
+----------
+Authentication piggy-backs on the named ``snow`` CLI connection
+identified by ``CLI_CONNECTION_NAME``. ``_load_named_connection()`` reads
+either ``~/.snowflake/connections.toml`` or ``[connections.<name>]`` in
+``~/.snowflake/config.toml`` and normalizes the snow-CLI alias
+``private_key_path`` to ``private_key_file`` so keypair auth works
+out-of-the-box regardless of which alias the user picked.
 """
 
-import os
-import sys
+import argparse
 import json
-import time
+import os
 import random
 import signal
+import sys
+import time
 import uuid
-import requests
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from dataclasses import dataclass, asdict
-from typing import Optional
 from pathlib import Path
-import argparse
 
-# Task already exports .env/iceberg.env into the environment via dotenv,
-# so no config.env loading is needed here.
+import requests
 
-# Try to import Snowflake Ingest SDK
+# ---------------------------------------------------------------------------
+# Snowflake SDKs
+#
+# - snowflake.ingest.streaming (snowpipe-streaming): the data path. We open
+#   a channel against the default pipe ``VEHICLE_TELEMETRY_STREAM-STREAMING``
+#   and call ``append_rows()`` for each batch. No warehouse needed; the
+#   ingestion engine writes Parquet + Iceberg metadata directly to the
+#   table's storage location.
+# - snowflake.connector: only used by ``send_external_lineage()`` to read
+#   ``conn.account`` for the OpenLineage POST. Optional -- the streaming
+#   path itself does not need it.
+# ---------------------------------------------------------------------------
 try:
-    from snowflake.ingest import SimpleIngestManager
-    from snowflake.ingest import StagedFile
+    from snowflake.ingest.streaming import StreamingIngestClient
 
-    SNOWPIPE_AVAILABLE = True
+    STREAMING_AVAILABLE = True
 except ImportError:
-    SNOWPIPE_AVAILABLE = False
-    print("Warning: snowflake-ingest not available. Using connector fallback.")
+    STREAMING_AVAILABLE = False
+    print("ERROR: snowpipe-streaming is not installed. Run: pip install snowpipe-streaming")
 
-# Try to import Snowflake Connector
-try:
-    import snowflake.connector
-    from snowflake.connector.pandas_tools import write_pandas
+# ---------------------------------------------------------------------------
+# Configuration
+#
+# Everything below is read from the environment that go-task already
+# populated from .env/iceberg.env. Required vars are validated with a hard
+# exit; everything else falls back to sensible defaults so the script can
+# also be invoked manually for ad-hoc testing.
+# ---------------------------------------------------------------------------
 
-    CONNECTOR_AVAILABLE = True
-except ImportError:
-    CONNECTOR_AVAILABLE = False
-
-# Configuration (sourced from shirc's .env/iceberg.env via Task)
+# --- Target object identity (medallion: BRONZE / RAW) ----------------------
 CLI_CONNECTION_NAME = os.getenv('CLI_CONNECTION_NAME')
 SNOWFLAKE_DATABASE = os.getenv('DEMO_DATABASE_NAME', 'FLEET_ANALYTICS_DB')
 SNOWFLAKE_SCHEMA = os.getenv('DEMO_SCHEMA_NAME_BRONZE', 'RAW')
-SNOWFLAKE_TABLE = 'VEHICLE_TELEMETRY_STREAM'
+SNOWFLAKE_TABLE = 'VEHICLE_TELEMETRY_STREAM'  # created by 001-create_iceberg_tables.sql
 SNOWFLAKE_WAREHOUSE = os.getenv('DEMO_WAREHOUSE_NAME', 'FLEET_ANALYTICS_WH')
 
 if not CLI_CONNECTION_NAME:
+    # Hard failure: without a connection name we can't authenticate.
     print("ERROR: CLI_CONNECTION_NAME is not set in .env/iceberg.env")
     sys.exit(1)
 
-# Streaming configuration
-MAX_DURATION_SECONDS = int(os.getenv('STREAMING_DURATION', 300))  # 5 minutes max
-VEHICLE_COUNT = int(os.getenv('STREAMING_VEHICLE_COUNT', 50))
+# --- Workload shape --------------------------------------------------------
+# MAX_DURATION_SECONDS is a wall-clock cap. When --events is also passed
+# (see main()), whichever bound trips first stops the loop.
+MAX_DURATION_SECONDS = int(os.getenv('STREAMING_DURATION', 300))   # 5 minutes
+VEHICLE_COUNT = int(os.getenv('STREAMING_VEHICLE_COUNT', 50))      # fleet size
 EVENTS_PER_SECOND = float(os.getenv('STREAMING_EVENTS_PER_SECOND', 2))
-BATCH_SIZE = 10
+BATCH_SIZE = 10  # events accumulated locally before each commit
 
-# External Lineage Configuration
-# Simulates telemetry coming from an MQTT/IoT broker (realistic for vehicle fleets)
-# Common platforms: AWS IoT Core, Azure IoT Hub, HiveMQ, EMQX
+# --- External lineage (OpenLineage POST to Snowflake REST API) -------------
+# These describe a *fictional* upstream IoT/MQTT broker. The lineage POST
+# tells Snowflake "this table is downstream of <broker>" so Snowsight's
+# Lineage tab shows a meaningful upstream node even though no real broker
+# exists. See: https://docs.snowflake.com/en/user-guide/external-lineage
 IOT_BROKER_NAMESPACE = os.getenv('IOT_BROKER_NAMESPACE', 'mqtt://fleet-iot-gateway.example.com')
 IOT_SOURCE_NAME = os.getenv('IOT_SOURCE_NAME', 'Fleet Vehicle Telematics')
 IOT_TOPIC_PATTERN = os.getenv('IOT_TOPIC_PATTERN', 'fleet/vehicles/+/telemetry')
 ENABLE_EXTERNAL_LINEAGE = os.getenv('ENABLE_EXTERNAL_LINEAGE', 'true').lower() == 'true'
 
-# Account URL for REST API (only used when ENABLE_EXTERNAL_LINEAGE is true).
-# If unset we'll fall back to conn.account once the connection is established.
+# Account URL host for the REST endpoint. When unset we resolve it from
+# conn.account at call-time, so most users never need to set this.
 SNOWFLAKE_ACCOUNT_URL = os.getenv('SNOWFLAKE_ACCOUNT_URL')
 
-# PAT for REST API authentication (same token used for streaming)
+# Programmatic Access Token (PAT) used to call the lineage REST endpoint.
+# Lineage is silently skipped when this is empty — the streaming itself
+# works fine without it because keypair auth handles the data path.
 SNOWFLAKE_PAT = os.getenv('SNOWFLAKE_ACCOUNTADMIN_TOKEN', '')
 
-# Global flag for graceful shutdown
+# --- Process-wide signal handling ------------------------------------------
+# Flipped to False by Ctrl-C / SIGTERM so the streaming loop exits cleanly,
+# flushing any in-flight batch and posting lineage before disconnecting.
 running = True
 
 
 def signal_handler(sig, frame):
-    """Handle interrupt signal for graceful shutdown."""
+    """Flip the global ``running`` flag so the main loop exits gracefully."""
     global running
     print("\n\nReceived interrupt signal. Shutting down gracefully...")
     running = False
@@ -91,30 +138,48 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 
 def send_external_lineage(conn, total_events: int, start_time: datetime, end_time: datetime):
-    """
-    Send OpenLineage event to Snowflake's External Lineage endpoint.
+    """POST an OpenLineage COMPLETE event to Snowflake's External Lineage endpoint.
 
-    This establishes lineage showing data flow from the IoT/MQTT broker
-    (where vehicles publish telemetry) to the Snowflake Iceberg table.
+    Establishes a directed lineage edge::
+
+        IoT/MQTT broker (input)  --->  RAW.VEHICLE_TELEMETRY_STREAM (output)
+
+    so the Lineage tab in Snowsight shows ``IOT_SOURCE_NAME`` as an upstream
+    producer even though, in this demo, the events were synthesized locally.
+
+    Required privileges (run once as ACCOUNTADMIN)::
+
+        GRANT INGEST LINEAGE ON ACCOUNT TO ROLE <streaming-role>;
+
+    Required environment for this call:
+      - ``SNOWFLAKE_ACCOUNTADMIN_TOKEN``  -- PAT used as bearer token.
+      - ``SNOWFLAKE_ACCOUNT_URL`` (optional) -- override the host segment of
+        the REST URL. When unset we derive it from ``conn.account``.
+
+    Failure modes:
+      - ``not ENABLE_EXTERNAL_LINEAGE`` or no PAT -> silent skip.
+      - HTTP 403 -> grant ``INGEST LINEAGE`` and retry.
+      - Other HTTP/network errors -> printed but non-fatal; the streaming
+        run is considered successful regardless.
 
     See: https://docs.snowflake.com/en/user-guide/external-lineage
     """
     if not ENABLE_EXTERNAL_LINEAGE:
         return
 
-    # Check if PAT is configured (required for REST API)
+    # No PAT means no REST auth; nothing else uses this token, so just skip.
     if not SNOWFLAKE_PAT:
         print("\nNote: SNOWFLAKE_ACCOUNTADMIN_TOKEN not set in .env/iceberg.env. Skipping lineage registration.")
         return
 
-    # Build lineage endpoint URL using configured account URL
-    # Keep dashes as-is for the standard REST API (unlike Iceberg catalog which needs underscores)
+    # Build lineage endpoint. Note: this is the *standard* REST host (dashes
+    # preserved); the Iceberg-specific catalog REST host needs underscores.
     account_url = (SNOWFLAKE_ACCOUNT_URL or conn.account).lower()
     lineage_endpoint = f"https://{account_url}.snowflakecomputing.com/api/v2/lineage/external-lineage"
 
-    # Build the OpenLineage COMPLETE event
-    # Input: MQTT/IoT broker topic where vehicles publish telemetry
-    # Output: Snowflake Iceberg table
+    # OpenLineage COMPLETE event -- one input dataset (the broker topic), one
+    # output dataset (the Iceberg table). The facets carry human-readable
+    # descriptions plus row/byte stats so Snowsight can display them.
     lineage_event = {
         "eventType": "COMPLETE",
         "eventTime": end_time.isoformat(),
@@ -137,6 +202,7 @@ def send_external_lineage(conn, total_events: int, start_time: datetime, end_tim
         "schemaURL": "https://openlineage.io/spec/1-0-5/OpenLineage.json",
         "inputs": [
             {
+                # Upstream node (fictional MQTT/IoT broker)
                 "namespace": IOT_BROKER_NAMESPACE,
                 "name": IOT_SOURCE_NAME,
                 "facets": {
@@ -159,6 +225,8 @@ def send_external_lineage(conn, total_events: int, start_time: datetime, end_tim
         ],
         "outputs": [
             {
+                # Downstream node (the actual Iceberg table). Namespace must
+                # be ``snowflake://<account>`` for Snowsight to resolve it.
                 "namespace": f"snowflake://{conn.account}",
                 "name": f"{SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_TABLE}",
                 "facets": {
@@ -169,15 +237,15 @@ def send_external_lineage(conn, total_events: int, start_time: datetime, end_tim
                         "_producer": "https://github.com/snowflakedb/snowpipe-streaming",
                         "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/OutputStatisticsOutputDatasetFacet.json",
                         "rowCount": total_events,
-                        "size": total_events * 500  # Approximate bytes per event
+                        "size": total_events * 500  # rough mean payload bytes
                     }
                 }
             }
         ]
     }
 
-    # Send to Snowflake External Lineage endpoint
-    # Using PAT (Programmatic Access Token) for authentication
+    # PAT auth: the X-Snowflake-Authorization-Token-Type header tells
+    # Snowflake to treat the bearer token as a PAT rather than a session JWT.
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {SNOWFLAKE_PAT}",
@@ -199,6 +267,7 @@ def send_external_lineage(conn, total_events: int, start_time: datetime, end_tim
                 f"\n✓ External lineage registered: {IOT_SOURCE_NAME} → {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{SNOWFLAKE_TABLE}")
             print("  View in Snowsight: Catalog » Database Explorer » Select table » Lineage tab")
         elif response.status_code == 403:
+            # Most common failure: privilege missing. Print the exact GRANT.
             print(f"\nNote: External lineage not registered (missing INGEST LINEAGE privilege)")
             print("  To enable, run as ACCOUNTADMIN:")
             print("    GRANT INGEST LINEAGE ON ACCOUNT TO ROLE ACCOUNTADMIN;")
@@ -206,12 +275,28 @@ def send_external_lineage(conn, total_events: int, start_time: datetime, end_tim
             print(f"\nNote: Lineage registration returned status {response.status_code}: {response.text[:200]}")
 
     except requests.exceptions.RequestException as e:
+        # Network / DNS / TLS issues -- log but don't fail the streaming run.
         print(f"\nNote: Could not send lineage event: {e}")
+
+
+# ===========================================================================
+# Vehicle simulation
+#
+# Each vehicle is a small mutable state machine. The loop in main() picks a
+# random subset of vehicles per tick, walks each one through one step of
+# physics-ish updates, and emits a JSON event for it. The state object
+# carries cumulative driver-behavior counters (hard accelerations, brakes,
+# sharp turns) so downstream Iceberg dynamic tables can aggregate them.
+# ===========================================================================
 
 
 @dataclass
 class VehicleState:
-    """Tracks the current state of a simulated vehicle."""
+    """Mutable state for one simulated vehicle.
+
+    Counters (``hard_accelerations``, ``hard_brakes``, ``sharp_turns``)
+    accumulate across the run and are included in every emitted event.
+    """
     vehicle_id: str
     latitude: float
     longitude: float
@@ -230,7 +315,12 @@ class VehicleState:
 
 
 def create_vehicle_fleet(count: int) -> list[VehicleState]:
-    """Create a fleet of vehicles with initial states."""
+    """Build ``count`` vehicles distributed across five US regions.
+
+    Vehicles are seeded with random-but-plausible positions, speeds, and
+    engine readings. About 5% start with a check-engine light on, ~3% with
+    a tire-pressure warning, simulating a real fleet's baseline issue rate.
+    """
     regions = [
         ("Pacific Northwest", 47.6, -122.3),
         ("California", 34.0, -118.2),
@@ -241,6 +331,7 @@ def create_vehicle_fleet(count: int) -> list[VehicleState]:
 
     vehicles = []
     for i in range(count):
+        # Round-robin across regions; jitter lat/lon to spread within region.
         region_name, base_lat, base_lon = regions[i % len(regions)]
         vehicle = VehicleState(
             vehicle_id=f"VH-{i:04d}",
@@ -265,40 +356,48 @@ def create_vehicle_fleet(count: int) -> list[VehicleState]:
 
 
 def update_vehicle_state(vehicle: VehicleState) -> VehicleState:
-    """Simulate changes in vehicle state."""
-    # Update speed (with some randomness)
+    """Advance a vehicle's state by one simulation tick.
+
+    Mutates and returns the same object (returning is a convenience for
+    chained expressions). Models speed drift, simplified position update,
+    occasional turns, engine metric drift, fuel burn, and rare diagnostic
+    events. Hard accel/brake counters increment when the speed delta
+    exceeds a threshold.
+    """
+    # Speed: small random walk, clamped to a plausible 0-95 mph range.
     speed_change = random.uniform(-10, 10)
     vehicle.speed_mph = max(0, min(95, vehicle.speed_mph + speed_change))
 
-    # Update position based on speed and heading
-    movement = vehicle.speed_mph * 0.00001  # Simplified movement
+    # Position: stretch lat/lon proportional to speed. Not realistic motion,
+    # just enough to make consecutive points form a plausible scatter.
+    movement = vehicle.speed_mph * 0.00001
     vehicle.latitude += movement * random.uniform(-0.5, 1)
     vehicle.longitude += movement * random.uniform(-1, 0.5)
 
-    # Update heading with occasional turns
+    # Heading: 10% chance of a turn each tick; >30° turns count as "sharp".
     if random.random() < 0.1:
         heading_change = random.uniform(-45, 45)
         vehicle.heading = (vehicle.heading + heading_change) % 360
         if abs(heading_change) > 30:
             vehicle.sharp_turns += 1
 
-    # Update engine metrics
+    # Engine metrics drift within physically plausible ranges.
     vehicle.engine_rpm = max(600, min(6000, vehicle.engine_rpm + random.randint(-300, 300)))
     vehicle.engine_temp_f = max(160, min(250, vehicle.engine_temp_f + random.randint(-3, 5)))
     vehicle.oil_pressure_psi = max(20, min(60, vehicle.oil_pressure_psi + random.uniform(-2, 2)))
 
-    # Fuel consumption
+    # Fuel: linear-ish burn rate proportional to speed.
     fuel_consumption = vehicle.speed_mph * 0.001 + random.uniform(0, 0.01)
     vehicle.fuel_level_pct = max(0, vehicle.fuel_level_pct - fuel_consumption)
 
-    # Driver behavior events
+    # Driver behavior: a sudden speed change is an aggressive event.
     if abs(speed_change) > 8:
         if speed_change > 0:
             vehicle.hard_accelerations += 1
         else:
             vehicle.hard_brakes += 1
 
-    # Random diagnostic events
+    # Rare diagnostic flips, simulating a CEL or TPMS warning toggling.
     if random.random() < 0.001:
         vehicle.check_engine = not vehicle.check_engine
     if random.random() < 0.002:
@@ -308,10 +407,24 @@ def update_vehicle_state(vehicle: VehicleState) -> VehicleState:
 
 
 def generate_telemetry_event(vehicle: VehicleState) -> dict:
-    """Generate a telemetry event for a vehicle."""
+    """Build the wire-format event for one vehicle tick.
+
+    Returns a dict with three keys matching the columns of
+    ``VEHICLE_TELEMETRY_STREAM``:
+
+      - ``VEHICLE_ID``       (STRING)
+      - ``EVENT_TIMESTAMP``  (TIMESTAMP_NTZ -- pass a datetime object)
+      - ``TELEMETRY_DATA``   (VARIANT -- pass a native dict, NOT a JSON
+                              string. The SDK serializes dicts to OBJECT;
+                              passing a JSON string would land as VARCHAR.)
+
+    The nested JSON shape under ``TELEMETRY_DATA`` is what downstream
+    dynamic tables (TELEMETRY_ENRICHED, DAILY_FLEET_SUMMARY) extract via
+    colon notation.
+    """
     now = datetime.now(timezone.utc)
 
-    # Create the VARIANT payload
+    # Native dict -- the streaming SDK serializes this directly to VARIANT.
     telemetry_data = {
         "location": {
             "lat": round(vehicle.latitude, 6),
@@ -328,6 +441,7 @@ def generate_telemetry_event(vehicle: VehicleState) -> dict:
         "diagnostics": {
             "check_engine": vehicle.check_engine,
             "tire_pressure_warning": vehicle.tire_pressure_warning,
+            # P0300 = generic random/multiple cylinder misfire (just illustrative)
             "codes": ["P0300"] if vehicle.check_engine else []
         },
         "driver_behavior": {
@@ -343,22 +457,43 @@ def generate_telemetry_event(vehicle: VehicleState) -> dict:
     }
 
     return {
+        # The SDK matches dict keys against the table's columns (case-insensitive).
         "VEHICLE_ID": vehicle.vehicle_id,
-        "EVENT_TIMESTAMP": now.strftime("%Y-%m-%d %H:%M:%S.%f"),
-        "TELEMETRY_DATA": json.dumps(telemetry_data)
+        "EVENT_TIMESTAMP": now,           # datetime -> TIMESTAMP_NTZ
+        "TELEMETRY_DATA": telemetry_data, # native dict -> VARIANT (OBJECT)
     }
 
 
-def _load_named_connection(name: str) -> dict:
-    """Resolve a snow-CLI connection name into kwargs for snowflake.connector.connect().
+# ===========================================================================
+# Streaming client management
+#
+# We resolve credentials from snow CLI's TOML so users don't have to
+# duplicate config across `snow connection add` and a separate streaming
+# profile. The Streaming SDK requires a profile.json file containing the
+# account, user, URL, and an inline PEM private key. We synthesize that
+# file from the parsed connection params.
+#
+# The TOML parsing also normalizes snow-CLI-only aliases (eg. the
+# `private_key_path` -> `private_key_file` rename) before use.
+# ===========================================================================
 
-    Handles both file layouts (~/.snowflake/connections.toml or
-    [connections.<name>] inside ~/.snowflake/config.toml) and normalizes the
-    snow-CLI-only key alias `private_key_path` to `private_key_file` that the
-    Python connector recognizes.
+
+def _load_named_connection(name: str) -> dict:
+    """Return a kwargs dict mirroring the named ``snow`` CLI connection.
+
+    Search order:
+      1. ``~/.snowflake/connections.toml``  (each connection is a top-level
+         table named after the connection)
+      2. ``~/.snowflake/config.toml``       (each connection is under
+         ``[connections.<name>]``)
+
+    Raises ``RuntimeError`` if neither file contains the named connection.
+
+    Aliases normalized:
+      - ``private_key_path`` -> ``private_key_file``  (snow CLI <-> connector)
     """
     try:
-        import tomllib  # Python 3.11+
+        import tomllib  # Python 3.11+ stdlib
     except ModuleNotFoundError:
         import tomli as tomllib  # type: ignore[no-redef]
 
@@ -370,11 +505,13 @@ def _load_named_connection(name: str) -> dict:
             continue
         with path.open("rb") as fh:
             data = tomllib.load(fh)
-        # connections.toml: top-level table per connection name
+
+        # Layout 1 (connections.toml): [<name>]  <-- top-level table
         if name in data and isinstance(data[name], dict):
             params = dict(data[name])
             break
-        # config.toml: [connections.<name>]
+
+        # Layout 2 (config.toml): [connections.<name>]
         connections = data.get("connections", {})
         if name in connections:
             params = dict(connections[name])
@@ -384,51 +521,88 @@ def _load_named_connection(name: str) -> dict:
             f"Connection '{name}' not found in {candidates[0]} or {candidates[1]}"
         )
 
-    # snow CLI accepts `private_key_path`; the Python connector wants `private_key_file`
     if "private_key_path" in params and "private_key_file" not in params:
         params["private_key_file"] = params.pop("private_key_path")
 
     return params
 
 
-def create_connection():
-    """Open a Snowflake connection using shirc's named CLI connection.
+def create_streaming_client():
+    """Open a Snowpipe Streaming SDK client and one channel.
 
-    Reads ~/.snowflake/connections.toml or ~/.snowflake/config.toml directly
-    so we can normalize the snow-CLI-specific `private_key_path` alias the
-    Python connector doesn't recognize. Database/schema/warehouse from
-    .env/iceberg.env are applied after connecting so they take precedence
-    over any defaults baked into the connection.
+    Returns ``(client, channel, account)``:
+      - ``client``: a :class:`StreamingIngestClient` bound to the default
+        pipe ``<table>-STREAMING`` (Snowflake auto-creates it if absent).
+      - ``channel``: a single channel named ``fleet_p0`` -- production
+        deployments would open multiple channels (one per partition) for
+        higher throughput; one channel is plenty for the demo.
+      - ``account``: the account identifier extracted from the named
+        connection. Returned separately so ``send_external_lineage()`` can
+        post the OpenLineage event without needing a connector connection.
+
+    Auth requirement: the named CLI connection must use keypair auth
+    (``authenticator = "SNOWFLAKE_JWT"``) -- the Streaming SDK does not
+    support password auth.
     """
-    print(f"Connecting to Snowflake via CLI connection '{CLI_CONNECTION_NAME}'...")
+    if not STREAMING_AVAILABLE:
+        print("ERROR: snowpipe-streaming package missing. Run: pip install snowpipe-streaming")
+        sys.exit(1)
+
+    print(f"Resolving CLI connection '{CLI_CONNECTION_NAME}'...")
     params = _load_named_connection(CLI_CONNECTION_NAME)
-    conn = snowflake.connector.connect(**params)
-    cur = conn.cursor()
-    cur.execute(f"USE WAREHOUSE {SNOWFLAKE_WAREHOUSE}")
-    cur.execute(f"USE DATABASE {SNOWFLAKE_DATABASE}")
-    cur.execute(f"USE SCHEMA {SNOWFLAKE_SCHEMA}")
-    cur.close()
-    print("Connected!")
-    return conn
 
-
-def stream_batch(cursor, events: list[dict]):
-    """Insert a batch of events using an existing cursor."""
-    for event in events:
-        cursor.execute(
-            f"""
-            INSERT INTO {SNOWFLAKE_TABLE} (VEHICLE_ID, EVENT_TIMESTAMP, TELEMETRY_DATA)
-            SELECT 
-                %s,
-                %s::TIMESTAMP_NTZ,
-                PARSE_JSON(%s)
-            """,
-            (event["VEHICLE_ID"], event["EVENT_TIMESTAMP"], event["TELEMETRY_DATA"])
+    if not params.get("private_key_file"):
+        print(
+            f"ERROR: connection '{CLI_CONNECTION_NAME}' has no private_key_file. "
+            "Snowpipe Streaming requires keypair auth."
         )
+        sys.exit(1)
+
+    # SDK profile expects an inline PEM key, not a file path.
+    private_key_pem = Path(params["private_key_file"]).read_text()
+    profile = {
+        "account": params["account"],
+        "user": params["user"],
+        "url": f"https://{params['account']}.snowflakecomputing.com:443",
+        "private_key": private_key_pem,
+    }
+
+    # Persist a temp profile.json the SDK will read. Re-creating it each
+    # run is fine -- the SDK reads it once on client construction.
+    profile_path = Path("/tmp") / "shirc_streaming_profile.json"
+    profile_path.write_text(json.dumps(profile))
+
+    pipe_name = f"{SNOWFLAKE_TABLE}-STREAMING"
+    print(
+        f"Opening streaming client: pipe={SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{pipe_name}"
+    )
+    client = StreamingIngestClient(
+        client_name="shirc_fleet_telemetry_client",
+        db_name=SNOWFLAKE_DATABASE,
+        schema_name=SNOWFLAKE_SCHEMA,
+        pipe_name=pipe_name,
+        profile_json=str(profile_path),
+    )
+
+    channel, _status = client.open_channel(channel_name="fleet_p0")
+    print("Streaming channel ready.")
+    return client, channel, params["account"]
 
 
 def main():
-    """Main function to run the streaming simulation."""
+    """Entry point — print a banner, open a streaming channel, run the loop.
+
+    The loop accumulates ``BATCH_SIZE`` events locally then calls
+    ``channel.append_rows()`` -- the SDK handles batching, durability, and
+    background flush. It exits on the first of:
+      - SIGINT/SIGTERM (handled by ``signal_handler``)
+      - ``--events`` target reached
+      - ``MAX_DURATION_SECONDS`` wall-clock limit elapsed
+      - exception in the inner try (logged, but loop continues retrying)
+
+    After the loop we ``wait_for_flush()`` so all queued rows commit to the
+    Iceberg table before posting lineage and printing the summary.
+    """
     global running
 
     parser = argparse.ArgumentParser(description="Stream simulated vehicle telemetry into Snowflake.")
@@ -441,12 +615,14 @@ def main():
     args = parser.parse_args()
     target_events = args.events
 
+    # --- Banner ------------------------------------------------------------
     print("=" * 60)
     print("Snowflake Iceberg V3 - Streaming Telemetry Simulator")
     print("=" * 60)
     print(f"Connection: {CLI_CONNECTION_NAME}")
     print(f"Database: {SNOWFLAKE_DATABASE}")
     print(f"Table: {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_TABLE}")
+    print(f"Pipe: {SNOWFLAKE_TABLE}-STREAMING (Snowpipe Streaming SDK)")
     print(f"Vehicles: {VEHICLE_COUNT}")
     print(f"Events/second: {EVENTS_PER_SECOND}")
     if target_events is not None:
@@ -456,80 +632,100 @@ def main():
     print("Press Ctrl+C to stop streaming")
     print("-" * 60)
 
-    if not CONNECTOR_AVAILABLE:
-        print("ERROR: snowflake-connector-python is not installed.")
-        print("Please run: pip install snowflake-connector-python")
-        sys.exit(1)
+    # --- Setup -------------------------------------------------------------
+    # One client + one channel reused across all batches.
+    client, channel, account = create_streaming_client()
 
-    # Create a single connection (reused for all batches)
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    # Create vehicle fleet
     print(f"\nInitializing {VEHICLE_COUNT} vehicles...")
     vehicles = create_vehicle_fleet(VEHICLE_COUNT)
     print("Fleet initialized!")
 
-    # Streaming loop
     start_time = time.time()
     total_events = 0
     batch = []
 
     print("\nStarting streaming...\n")
 
+    # --- Main loop ---------------------------------------------------------
     try:
         while running and (time.time() - start_time) < MAX_DURATION_SECONDS:
+            # Honor --events target if set; this is in addition to (and
+            # usually fires before) the wall-clock cap above.
             if target_events is not None and total_events >= target_events:
                 break
-            # Select random vehicles to generate events
+
+            # Pick a random subset of vehicles for this tick. min() guards
+            # against BATCH_SIZE > fleet size (e.g. for a tiny smoke test).
             selected_vehicles = random.sample(vehicles, min(BATCH_SIZE, len(vehicles)))
 
             for vehicle in selected_vehicles:
-                # Update vehicle state
                 vehicle = update_vehicle_state(vehicle)
-
-                # Generate event
                 event = generate_telemetry_event(vehicle)
                 batch.append(event)
 
-            # Send batch when full
+            # Flush the batch when full. ``append_rows`` queues events for
+            # async ingest; the SDK batches and writes Parquet+Iceberg
+            # metadata in the background. ``offset_token`` enables
+            # exactly-once recovery if the channel is reopened later.
             if len(batch) >= BATCH_SIZE:
                 try:
-                    stream_batch(cursor, batch)
-                    conn.commit()
-                    total_events += len(batch)
+                    next_offset = total_events + len(batch)
+                    channel.append_rows(batch, end_offset_token=str(next_offset))
+                    total_events = next_offset
 
-                    # Progress indicator
+                    # Single-line progress display (carriage-return overwrites).
                     elapsed = time.time() - start_time
                     rate = total_events / elapsed if elapsed > 0 else 0
-                    print(f"\rEvents streamed: {total_events:,} | "
+                    print(f"\rEvents queued: {total_events:,} | "
                           f"Rate: {rate:.1f}/sec | "
                           f"Elapsed: {elapsed:.0f}s", end="", flush=True)
 
                     batch = []
                 except Exception as e:
-                    print(f"\nError streaming batch: {e}")
-                    # Keep trying
+                    print(f"\nError appending batch: {e}")
+                    # Intentionally keep the (failed) batch around so the
+                    # next iteration retries it implicitly via length check.
 
-            # Control rate
+            # Throttle the producer so we don't overshoot EVENTS_PER_SECOND.
             time.sleep(1 / EVENTS_PER_SECOND)
 
     except KeyboardInterrupt:
+        # SIGINT also flips `running` via signal_handler, but catch here
+        # too so an interrupt before the handler runs doesn't show a stack.
         pass
 
-    # Capture end time for lineage
+    # --- Flush + lineage + cleanup -----------------------------------------
+    # Force any in-flight batch through, then block until all queued rows
+    # commit to the Iceberg table. Without this the script may exit before
+    # the SDK's background flush thread completes.
+    print("\nFlushing channel...")
+    try:
+        channel.wait_for_flush(timeout_seconds=30)
+    except Exception as e:
+        print(f"Warning: flush timed out or errored: {e}")
+
+    # Compute a [start, end] window for the OpenLineage event so Snowsight
+    # can show how long the pipeline ran.
     stream_end_time = datetime.now(timezone.utc)
     stream_start_time = datetime.fromtimestamp(start_time, tz=timezone.utc)
 
-    # Send external lineage event (before closing connection)
+    # Skip lineage if nothing got through — an empty event would be noise.
     if total_events > 0:
-        send_external_lineage(conn, total_events, stream_start_time, stream_end_time)
+        # Wrap account in a tiny stand-in so send_external_lineage can read
+        # ``conn.account`` without a full connector connection.
+        class _AccountHolder:
+            pass
+        holder = _AccountHolder()
+        holder.account = account
+        send_external_lineage(holder, total_events, stream_start_time, stream_end_time)
 
-    # Clean up connection
-    cursor.close()
-    conn.close()
+    try:
+        channel.close()
+    except Exception:
+        pass
+    client.close()
 
-    # Final stats
+    # --- Final stats -------------------------------------------------------
     elapsed = time.time() - start_time
     print(f"\n\n{'=' * 60}")
     print("Streaming Complete!")
