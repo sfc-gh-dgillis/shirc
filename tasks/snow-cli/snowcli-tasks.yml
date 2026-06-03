@@ -77,7 +77,7 @@ tasks:
     vars:
       EVENT_COUNT: '{{.EVENT_COUNT | default "100"}}'
     cmds:
-      - python3 pyutil/snowpipe_streaming/stream_telemetry.py --events {{.EVENT_COUNT}}
+      - cmd/stream-telemetry.sh {{.EVENT_COUNT}}
 
   apply-network-policy:
     desc: Creates an INGRESS network rule (current IP) and a network policy (run only if streaming connections fail).
