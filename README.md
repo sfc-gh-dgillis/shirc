@@ -188,28 +188,19 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 | `task snow-cli:drop-external-volume`                 | Drop external volume only                                  |
 | `task snow-cli:desc-external-volume`                 | Describe external volume and save JSON                     |
 | `task snow-cli:run-init`                             | Run initialization SQL (handles both managed and external modes) |
+| `task snow-cli:sort-and-process-sql-folder`         | Run the batch-1 analytics pipeline (SQL scripts 001–010 in order) |
 | `task snow-cli:upload-files-to-internal-named-stage` | Upload files to internal stage                             |
-| `task snow-cli:generate-notebook`                    | Generate notebook from template                            |
-| `task snow-cli:deploy-notebook`                      | Deploy notebook to Snowflake                               |
+| `task snow-cli:generate-fleet-notebook`             | Generate the fleet analytics notebook from its template    |
+| `task snow-cli:deploy-notebook`                     | Deploy notebook to Snowflake                               |
+| `task snow-cli:stream-telemetry`                    | Stream simulated vehicle telemetry via Snowpipe Streaming SDK |
 | `task snow-cli:drop-database-if-exists`              | Drop database if it exists                                 |
-
-### Iceberg V3 Feature Tables (batch-2)
-
-| Task                            | Description                                                          |
-|---------------------------------|----------------------------------------------------------------------|
-| `task snow-cli:create-tables`   | Create Iceberg V3 feature-showcase tables                            |
-| `task snow-cli:load-data`       | Load staged JSON data into batch-2 tables                            |
-| `task snow-cli:run-dml-demo`    | Run DML demo (deletion vectors, row lineage)                         |
-| `task snow-cli:drop-tables`     | Drop batch-2 demo tables                                            |
-| `task snow-cli:stream-telemetry`| Stream simulated vehicle telemetry via Snowpipe Streaming SDK        |
 
 ### Python/Spark Tasks
 
 | Task                              | Description                                           |
 |-----------------------------------|-------------------------------------------------------|
-| `task python-tasks:create-conda-env`  | Create conda environment with PySpark and Jupyter |
-| `task python-tasks:remove-conda-env`  | Remove conda environment                          |
-| `task python-tasks:run-jupyter`       | Launch Jupyter notebook in conda environment      |
+| `task python-tasks:create-uv-venv`    | Create a `venv` virtual environment using `uv`    |
+| `task python-tasks:run-jupyter`       | Launch the Spark/Jupyter interop notebook         |
 
 ## Architecture
 
@@ -223,19 +214,23 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 |  (Snowflake handles all storage internally)                 |
 |                                                             |
 |  +-------------------------------------------------------+  |
-|  |   Database: your_database                             |  |
-|  |   +-- Schema: RAW                                     |  |
+|  |   Database: your_database (ICEBERG_VERSION_DEFAULT=3) |  |
+|  |   +-- Schema: BRONZE (raw)                            |  |
 |  |   |   +-- Stage: your_stage (internal)                |  |
 |  |   |   +-- Iceberg V3 Tables                           |  |
-|  |   |       +-- CUSTOMER_EVENTS (VARIANT)               |  |
-|  |   |       +-- vehicle_telemetry_stream (streaming)    |  |
-|  |   +-- Schema: REDACTED                                |  |
-|  |       +-- CUSTOMER_EVENTS_REDACTED (AI_REDACT)        |  |
+|  |   |       +-- VEHICLE_TELEMETRY_STREAM (VARIANT)      |  |
+|  |   |       +-- MAINTENANCE_LOGS / SENSOR_READINGS ...  |  |
+|  |   |       +-- VEHICLE_LOCATIONS (GEOGRAPHY)           |  |
+|  |   +-- Schema: SILVER (curated)                        |  |
+|  |   |   +-- Dynamic Iceberg Tables                      |  |
+|  |   +-- Schema: GOLD (analytics)                        |  |
+|  |   |   +-- Dynamic tables + Semantic View + Agent      |  |
+|  |   +-- Schema: POLICIES (masking, tags)                |  |
 |  +-------------------------------------------------------+  |
 |                                                             |
 |  +-------------------------------------------------------+  |
-|  |   Role: V3_DEMO_ICEBERG_ENGINEER_ROLE                 |  |
-|  |   Notebook: iceberg_v3_demo_notebook                  |  |
+|  |   Roles: analyst / engineer / admin                   |  |
+|  |   Notebook: fleet_analytics_notebook                  |  |
 |  +-------------------------------------------------------+  |
 |                                                             |
 +-------------------------------------------------------------+
@@ -275,15 +270,16 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 |  +-------------------------------------------------------+  |
 |                                                             |
 |  +-------------------------------------------------------+  |
-|  |   Database: your_database                             |  |
-|  |   +-- Schema: RAW                                     |  |
-|  |       +-- Stage: your_stage (internal)                |  |
-|  |       +-- Iceberg V3 Tables                           |  |
+|  |   Database: your_database (ICEBERG_VERSION_DEFAULT=3) |  |
+|  |   +-- Schema: BRONZE (raw)                            |  |
+|  |   |   +-- Stage: your_stage (internal)                |  |
+|  |   |   +-- Iceberg V3 Tables                           |  |
+|  |   +-- Schemas: SILVER / GOLD / POLICIES               |  |
 |  +-------------------------------------------------------+  |
 |                                                             |
 |  +-------------------------------------------------------+  |
-|  |   Role: V3_DEMO_ICEBERG_ENGINEER_ROLE                 |  |
-|  |   Notebook: iceberg_v3_demo_notebook                  |  |
+|  |   Roles: analyst / engineer / admin                   |  |
+|  |   Notebook: fleet_analytics_notebook                  |  |
 |  +-------------------------------------------------------+  |
 |                                                             |
 +-------------------------------------------------------------+
@@ -303,10 +299,10 @@ task snow-cli:stream-telemetry EVENT_COUNT=500
 
 **Requirements:**
 - Key-pair authentication configured in your Snow CLI connection (`private_key_path`)
-- Python dependencies: `pip install snowpipe-streaming cryptography`
-- Target table `VEHICLE_TELEMETRY_STREAM` created via `task snow-cli:create-tables`
+- A virtual environment — `task stream-telemetry` auto-creates `.venv` and installs `pyutil/snowpipe_streaming/requirements.txt` via `cmd/stream-telemetry.sh`
+- Target table `VEHICLE_TELEMETRY_STREAM` created by the batch-1 pipeline (`task snow-cli:sort-and-process-sql-folder`, part of `demo-up`)
 
-The script reads credentials from your Snow CLI `~/.snowflake/config.toml` using the `CLI_CONNECTION_NAME` connection.
+The script reads credentials from your Snow CLI `~/.snowflake/config.toml` (or `connections.toml`) using the `CLI_CONNECTION_NAME` connection. External lineage is registered with a JWT generated by `snow connection generate-jwt` (no PAT required).
 
 ## Usage Examples
 
@@ -350,28 +346,12 @@ task snow-cli:run-init
 # 5. Upload demo files
 task snow-cli:upload-files-to-internal-named-stage
 
-# 6. Generate and deploy notebook
-task snow-cli:generate-notebook
+# 6. Run the batch-1 analytics pipeline (tables, dynamic tables, governance, semantic view, agent)
+task snow-cli:sort-and-process-sql-folder
+
+# 7. Generate and deploy notebook
+task snow-cli:generate-fleet-notebook
 task snow-cli:deploy-notebook
-```
-
-### Batch-2 Feature Tables
-
-```bash
-# Create standalone Iceberg V3 feature-showcase tables
-task snow-cli:create-tables
-
-# Load data
-task snow-cli:load-data
-
-# Run DML demo (deletion vectors, row lineage)
-task snow-cli:run-dml-demo
-
-# Stream telemetry data
-task snow-cli:stream-telemetry
-
-# Tear down batch-2 tables only
-task snow-cli:drop-tables
 ```
 
 ### Individual Operations
@@ -403,34 +383,47 @@ shirc/
 |   +-- snow-cli/
 |   |   +-- snowcli-tasks.yml         # Snowflake CLI task definitions
 |   |   +-- cmd/                      # Snowflake CLI scripts
-|   |   |   +-- run-init.sh           # Unified init script (handles both storage modes)
-|   |   |   +-- generate-notebook.sh  # Notebook generation
-|   |   |   +-- deploy-notebook.sh    # Notebook deployment
+|   |   |   +-- run-init.sh                  # Unified init script (handles both storage modes)
+|   |   |   +-- create-external-volume.sh    # External volume creation (external mode)
+|   |   |   +-- desc-external-volume.sh      # Describe external volume -> output JSON
+|   |   |   +-- drop-external-volume.sh      # External volume teardown
+|   |   |   +-- generate-notebook-generic.sh # Notebook generation (calls .py)
+|   |   |   +-- deploy-notebook.sh           # Notebook deployment
+|   |   |   +-- stream-telemetry.sh          # venv bootstrap + run streaming script
 |   |   +-- sql/
-|   |   |   +-- infra-up-external/      # External volume DDL (external mode only)
-|   |   |   |   +-- 001-create_external_volume.sql  # External volume DDL
-|   |   |   +-- init.sql                 # Unified init SQL (both storage modes)
-|   |   |   +-- batch-2/
-|   |   |       +-- 001-create-tables.sql     # Iceberg V3 feature tables
-|   |   |       +-- 002-load-data.sql         # Data loading
-|   |   |       +-- 003-dml-demo.sql          # DML demo (deletion vectors)
-|   |   |       +-- teardown.sql              # Drop batch-2 tables
-|   |   +-- notebook/                 # Notebook templates
-|   |   |   +-- iceberg_v3_template.ipynb
-|   |   |   +-- iceberg_v3_demo_snowflake_yml_template.yml
+|   |   |   +-- init/                        # Init SQL (run before batch-1)
+|   |   |   |   +-- init.sql                     # Warehouse, roles, DB (ICEBERG_VERSION_DEFAULT=3), medallion schemas, stage, EAI
+|   |   |   |   +-- init_storage_managed.sql     # Sets EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'
+|   |   |   |   +-- init_storage_external.sql    # Points DB at the user's external volume
+|   |   |   |   +-- create_external_volume.sql   # CREATE EXTERNAL VOLUME (external mode only)
+|   |   |   +-- batch-1/                      # Analytics pipeline (run in numeric order)
+|   |   |   |   +-- 001-create_iceberg_tables.sql      # 6 Iceberg V3 tables (VARIANT, GEOGRAPHY, DEFAULT)
+|   |   |   |   +-- 002-load_iceberg_lookup_tables.sql # Seed lookup/sample data
+|   |   |   |   +-- 003-create_dynamic_tables.sql      # 4 dynamic Iceberg tables
+|   |   |   |   +-- 004-grants.sql                     # Role hierarchy + INGEST LINEAGE
+|   |   |   |   +-- 005-masking_policies.sql           # PII masking policies
+|   |   |   |   +-- 006-dmfs.sql                       # Data metric functions
+|   |   |   |   +-- 007-tags.sql                       # Governance tags
+|   |   |   |   +-- 008-load_sample_data.sql           # COPY INTO from stage + more rows
+|   |   |   |   +-- 009-create_semantic_view.sql       # Native CREATE SEMANTIC VIEW
+|   |   |   |   +-- 010-create_agent.sql               # Cortex Agent + helper views
+|   |   |   +-- network_policy.sql           # Optional INGRESS rule for streaming
+|   |   +-- notebook/
+|   |   |   +-- fleet_analytics_notebook/
+|   |   |       +-- templates/            # Source notebook template
+|   |   |       +-- generated/            # Rendered notebook (deployed to Snowsight)
 |   |   +-- pyutil/
-|   |       +-- snowcliput/           # Python utility for file uploads to stages
-|   |       +-- snowclisp/            # Python utility for stored procedures
+|   |       +-- snowcliput/           # File uploader (PUT files to internal stage)
+|   |       +-- snowclisp/            # SQL pipeline runner (executes batch-1 in order)
 |   |       +-- snowpipe_streaming/   # Snowpipe Streaming SDK integration
-|   |       |   +-- stream_telemetry.py   # Vehicle telemetry data generator
-|   |       |   +-- requirements.txt
-|   |       +-- genagentsql/          # SQL generation utility
+|   |           +-- stream_telemetry.py   # Vehicle telemetry simulator + external lineage
+|   |           +-- requirements.txt
 |   +-- python/
-|   |   +-- python-tasks.yml          # Conda/Spark task definitions
-|   |   +-- notebook/                 # Spark/Jupyter notebooks
+|   |   +-- python-tasks.yml          # uv venv / Jupyter task definitions
+|   |   +-- notebook/                 # Spark 4.0 + Horizon REST catalog interop notebook
 |   +-- validate-prerequisites/
 |       +-- validate-prerequisite-tasks.yml
-+-- upload/                           # Files to upload to internal stage
++-- upload/                           # JSON files uploaded to the internal stage
 +-- output/                           # Generated output files (git-ignored)
 |   +-- aws-output.json               # AWS resource ARNs and metadata
 |   +-- bucket-policy-output.json     # Generated bucket policy
@@ -446,9 +439,10 @@ shirc/
 
 ### Managed Storage Mode
 
-1. **Initialization SQL**: Creates database with `EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'`, schemas (RAW + REDACTED), roles, users, and internal stage
-2. **File Upload**: Uploads demo JSON files to internal named stage
-3. **Notebook**: Generates and deploys demo notebook
+1. **Initialization SQL**: Creates the database with `EXTERNAL_VOLUME = 'SNOWFLAKE_MANAGED'` and `ICEBERG_VERSION_DEFAULT = 3`, medallion schemas (Bronze/Silver/Gold), roles, internal stage, and an external access integration for API calls
+2. **File Upload**: Uploads demo JSON files to the internal named stage
+3. **Batch-1 Pipeline**: Runs SQL scripts 001–010 (Iceberg tables, dynamic tables, governance, semantic view, agent)
+4. **Notebook**: Generates and deploys the fleet analytics notebook
 
 ### External Storage Mode
 
@@ -458,9 +452,10 @@ shirc/
 4. **Policy Attachment**: IAM policy attached to the role
 5. **External Volume**: Created in Snowflake pointing to your S3 bucket
 6. **Trust Policy Update**: AWS role trust policy updated to allow Snowflake's IAM user to assume the role
-7. **Initialization SQL**: Creates database, schema, roles, users, and internal stage
-8. **File Upload**: Uploads demo JSON files to internal named stage
-9. **Notebook**: Generates and deploys demo notebook
+7. **Initialization SQL**: Creates the database (`ICEBERG_VERSION_DEFAULT = 3`), medallion schemas, roles, internal stage, and external access integration
+8. **File Upload**: Uploads demo JSON files to the internal named stage
+9. **Batch-1 Pipeline**: Runs SQL scripts 001–010 (Iceberg tables, dynamic tables, governance, semantic view, agent)
+10. **Notebook**: Generates and deploys the fleet analytics notebook
 
 ### Resource Metadata (external mode)
 
@@ -556,9 +551,12 @@ cat output/external-volume-desc-storage-location.json | jq '.'
 
 After running `task demo-up` (managed mode), you will have:
 
-- Database with schemas (RAW + REDACTED), roles, and internal stage
-- Demo files uploaded to internal stage
-- Deployed notebook ready to run in Snowsight
+- Database with `ICEBERG_VERSION_DEFAULT = 3`, medallion schemas (Bronze/Silver/Gold) plus a policies schema, role hierarchy, and an internal stage
+- 6 source Iceberg tables (VARIANT, GEOGRAPHY, and DEFAULT-valued columns) seeded with sample fleet data
+- 4 dynamic Iceberg tables (one using `REFRESH_MODE = INCREMENTAL`)
+- Governance objects: PII masking policies, governance tags, and data metric functions
+- A native semantic view and a Cortex Agent over the fleet data
+- Demo files uploaded to the internal stage and the fleet analytics notebook deployed to Snowsight
 
 After running `task demo-up` (external mode), you additionally get:
 
@@ -567,20 +565,49 @@ After running `task demo-up` (external mode), you additionally get:
 - Snowflake external volume configured and integrated
 - All resource metadata saved in JSON files
 
-The deployed notebook demonstrates:
+The deployed notebook and streaming script demonstrate:
 
-- Creating Iceberg V3 tables with VARIANT columns
-- Loading JSON data into VARIANT columns
-- Querying VARIANT data using semi-structured notation
-- Redacting PII using AI_REDACT()
+- Querying VARIANT telemetry with semi-structured notation
+- Batch + API ingestion (COPY INTO, external access integration)
+- Declarative pipelines via dynamic Iceberg tables
+- Governance: masking, tags, DMFs, and lineage (incl. OpenLineage external lineage)
+- AI: semantic view, Cortex Agent, and `ML.FORECAST`
+- Geospatial analytics with GEOGRAPHY / H3
+- Real-time ingestion via the Snowpipe Streaming SDK
+- Cross-engine access from Spark 4.0 via the Horizon REST catalog (`variant_get`)
 
-The batch-2 feature tables demonstrate:
+## Iceberg V3 Feature Coverage
 
-- Partitioned Iceberg V3 tables
-- IoT event ingestion
-- Real-time streaming via Snowpipe Streaming SDK
-- Dynamic Iceberg tables (auto-refreshed)
-- DML operations with deletion vectors and row lineage
+This demo maps to the Snowflake-Labs quickstart *"Enterprise Lakehouse Platform for Iceberg V3"*. The table below shows which Iceberg V3 / lakehouse capabilities are demonstrated today versus not yet covered.
+
+**Demonstrated:**
+
+| Capability | Where |
+|------------|-------|
+| `ICEBERG_VERSION_DEFAULT = 3` | `sql/init/init.sql` |
+| VARIANT columns + semi-structured queries | `001-create_iceberg_tables.sql`, notebook |
+| GEOGRAPHY type + geospatial / H3 analytics | `001/002-*.sql`, notebook |
+| DEFAULT column values | `001-create_iceberg_tables.sql` (`VEHICLE_STATUS DEFAULT 'ACTIVE'`) |
+| Dynamic Iceberg tables (incl. `REFRESH_MODE = INCREMENTAL`) | `003-create_dynamic_tables.sql` |
+| Governance: masking policies, tags, DMFs | `005/006/007-*.sql` |
+| Native semantic view + Cortex Agent | `009/010-*.sql` |
+| `ML.FORECAST` predictive maintenance | fleet notebook |
+| Snowpipe Streaming ingestion | `pyutil/snowpipe_streaming/stream_telemetry.py` |
+| External (OpenLineage) lineage via JWT | `stream_telemetry.py` → `/api/v2/lineage/external-lineage` |
+| Cross-engine Spark 4.0 read via Horizon REST catalog | `tasks/python/notebook/` |
+
+**Not yet demonstrated (gaps / candidate improvements):**
+
+| Capability | Notes |
+|------------|-------|
+| Merge-on-read / deletion vectors (`MERGE`/`DELETE`/`UPDATE`) | No DML against Iceberg tables yet — the headline V3 write path |
+| Explicit row lineage (`_row_id`, sequence numbers) | Only used implicitly by the incremental dynamic table |
+| Time travel (`AT` / `BEFORE`) | Not shown in SQL or notebook |
+| Snapshot / table history inspection | No snapshot/history queries |
+| Schema evolution (`ADD`/`DROP`/`RENAME COLUMN`) | Not demonstrated |
+| Partitioning / clustering (`CLUSTER BY`, auto-clustering, search optimization) | No partition spec or clustering keys |
+| Table maintenance & monitoring (snapshot expiration, storage metrics) | Guide's "Table Maintenance" section is not yet implemented |
+| GEOMETRY type | Only GEOGRAPHY is used |
 
 ## Resources
 

@@ -4,7 +4,9 @@ This file provides guidance to AI coding agents (such as Snowflake Cortex Code C
 
 ## Project Overview
 
-SHIRC (Snowflake Horizon Iceberg REST Catalog) automates the setup of AWS and Snowflake infrastructure for Apache Iceberg tables. It uses [Task](https://taskfile.dev/) as the primary automation runner, with shell scripts and SQL files doing the actual work.
+SHIRC (Snowflake Horizon Iceberg REST Catalog) automates the setup of AWS and Snowflake infrastructure for Apache Iceberg V3 tables, and provisions a full Fleet IoT analytics demo on top of it. It uses [Task](https://taskfile.dev/) as the primary automation runner, with shell scripts, Python utilities, and SQL files doing the actual work.
+
+Beyond infrastructure, the demo builds an end-to-end lakehouse: source Iceberg tables, dynamic (declarative) Iceberg tables, governance (masking/tags/DMFs), a native semantic view, a Cortex Agent, Snowpipe Streaming ingestion with OpenLineage external lineage, and Spark 4.0 cross-engine access via the Horizon REST catalog.
 
 ## Prerequisites
 
@@ -67,8 +69,14 @@ task aws-cli:update-trust-policy-with-snowflake-user
 task snow-cli:create-external-volume
 task snow-cli:desc-external-volume
 task snow-cli:drop-external-volume
-task snow-cli:generate-notebook
+task snow-cli:run-init                        # init SQL (warehouse, roles, DB, schemas, stage)
+task snow-cli:sort-and-process-sql-folder     # batch-1 analytics pipeline (001–010, in order)
+task snow-cli:generate-fleet-notebook
 task snow-cli:deploy-notebook
+
+# Stream simulated telemetry via Snowpipe Streaming (auto-creates .venv, installs requirements.txt)
+task stream-telemetry                         # default 100 events
+task stream-telemetry EVENT_COUNT=500
 
 # Optional troubleshooting (creates ingress network policy for the streaming script)
 task apply-network-policy
@@ -81,12 +89,41 @@ task aws-cli:refresh-sso-token AWS_PROFILE=my-profile
 
 ### Task Flow
 
-`demo-up` orchestrates the full setup in order:
-1. AWS resources: S3 bucket → IAM policy → IAM role → attach policy
-2. Snowflake resources: create external volume → describe it (saves Snowflake IAM user ARN to `output/`)
-3. Update AWS trust policy with the Snowflake IAM user ARN (cross-account access)
-4. Run Snowflake init SQL (`sql/init.sql` — handles both storage modes via conditionals)
-5. Upload files to Snowflake internal named stage
+`infrastructure-up` routes by `STORAGE_MODE`:
+
+- **managed**: validate Snow CLI → run init SQL (no AWS).
+- **external**: AWS resources (S3 bucket → IAM policy → IAM role → attach) → create + describe external volume (saves Snowflake IAM user ARN to `output/`) → update AWS trust policy with that ARN (cross-account access) → run init SQL.
+
+Init SQL runs three files in sequence: `sql/init/init.sql` (warehouse, roles, database with `ICEBERG_VERSION_DEFAULT = 3`, medallion schemas, stage, external access integration), then the mode-specific storage file (`init_storage_managed.sql` or `init_storage_external.sql`). Storage mode is selected by which file runs — **not** by conditionals inside a single file.
+
+`demo-up` then layers the demo on top of `infrastructure-up`:
+1. Upload files to the Snowflake internal named stage.
+2. Run the batch-1 analytics pipeline (`sort-and-process-sql-folder` → scripts 001–010, executed in numeric order by `pyutil/snowclisp`).
+3. Generate the fleet analytics notebook from its template (`generate-fleet-notebook`).
+4. Deploy the notebook to Snowflake (`deploy-notebook`).
+
+### Batch-1 Analytics Pipeline (`sql/batch-1/`, run in order)
+
+| Script | Purpose |
+|--------|---------|
+| `001-create_iceberg_tables.sql` | 6 source Iceberg V3 tables (VARIANT, GEOGRAPHY, DEFAULT-valued columns) |
+| `002-load_iceberg_lookup_tables.sql` | Seed lookup / sample data |
+| `003-create_dynamic_tables.sql` | 4 dynamic Iceberg tables (one `REFRESH_MODE = INCREMENTAL`) |
+| `004-grants.sql` | Role hierarchy + `GRANT INGEST LINEAGE ON ACCOUNT` |
+| `005-masking_policies.sql` | PII masking policies on `VEHICLE_REGISTRY` |
+| `006-dmfs.sql` | Data metric functions applied to Iceberg tables |
+| `007-tags.sql` | Governance tags at table + column level |
+| `008-load_sample_data.sql` | `COPY INTO` from stage + additional rows |
+| `009-create_semantic_view.sql` | Native `CREATE SEMANTIC VIEW` over the Iceberg tables |
+| `010-create_agent.sql` | Cortex Agent (`cortex_analyst_text_to_sql`) + helper views |
+
+### Streaming + External Lineage
+
+`pyutil/snowpipe_streaming/stream_telemetry.py` simulates a vehicle fleet and ingests VARIANT events via the Snowpipe Streaming SDK (keypair auth resolved from the named `snow` CLI connection). After streaming, it POSTs an OpenLineage COMPLETE event to `/api/v2/lineage/external-lineage`, authenticating with a JWT from `snow connection generate-jwt` (no PAT). The `stream-telemetry` task runs via `cmd/stream-telemetry.sh`, which bootstraps `.venv` and installs `requirements.txt` before invoking the script.
+
+### Spark Interoperability
+
+`tasks/python/notebook/` contains a Spark 4.0 notebook that reads the Iceberg V3 tables (including `variant_get` on VARIANT columns) through the Snowflake Horizon REST catalog with vended credentials. `task spark-demo-up` provisions infrastructure and launches Jupyter.
 
 ### Output Files
 
@@ -97,7 +134,8 @@ All commands write metadata to `output/` (git-ignored):
 - `output/trust-policy-updated.json` — Trust policy updated with Snowflake IAM user
 - `output/external-volume-desc.json` — Full Snowflake external volume description
 - `output/external-volume-desc-storage-location.json` — Parsed storage location details
-- `output/snowflake_iceberg_v3_demo_notebook.ipynb` — Generated notebook
+
+The generated fleet notebook is written to `tasks/snow-cli/notebook/fleet_analytics_notebook/generated/` (the `templates/` copy is the source).
 
 Tasks are stateful and share data via these JSON files. Tasks like `delete-iam-policy`, `attach-policy-to-role`, and `update-trust-policy-with-snowflake-user` read ARNs from `output/aws-output.json` rather than accepting them as parameters.
 
@@ -114,13 +152,17 @@ tasks/
     json/template/                 # JSON templates (bucket-policy, trust-policy)
   snow-cli/
     snowcli-tasks.yml              # Snowflake CLI task definitions (runs from tasks/snow-cli/ dir)
-    cmd/                           # Shell scripts for Snowflake operations
-    sql/init.sql                   # Unified init SQL (warehouse, roles, database, schemas, grants, stage)
+    cmd/                           # Shell scripts for Snowflake operations (incl. stream-telemetry.sh)
+    sql/init/                      # Init SQL: init.sql + init_storage_{managed,external}.sql + create_external_volume.sql
+    sql/batch-1/                   # Analytics pipeline 001–010 (tables, dynamic tables, governance, semantic view, agent)
     sql/network_policy.sql         # Optional ingress NETWORK RULE + NETWORK POLICY (run via task apply-network-policy)
-    sql/infra-up-external/         # External volume DDL (external storage mode only)
-    notebook/                      # Jupyter notebook template for Snowflake demo
+    notebook/fleet_analytics_notebook/  # templates/ (source) + generated/ (deployed)
     pyutil/snowcliput/             # Python utility for uploading files to Snowflake stages
-    pyutil/snowclisp/              # Python utility (Snowflake stored procedures)
+    pyutil/snowclisp/              # Python utility that runs the batch-1 SQL pipeline in order
+    pyutil/snowpipe_streaming/     # Snowpipe Streaming simulator + external lineage (stream_telemetry.py)
+  python/
+    python-tasks.yml               # uv venv + Jupyter tasks
+    notebook/                      # Spark 4.0 + Horizon REST catalog interop notebook
   validate-prerequisites/
     validate-prerequisite-tasks.yml
 output/                            # Generated files (git-ignored)
@@ -129,8 +171,18 @@ upload/                            # Files to upload to Snowflake internal stage
 
 ### SQL Templating
 
-SQL files use Jinja-style `{{ variable_name }}` placeholders. The `snow sql` command processes these with `--variable` flags or connection context. The `run-init` task passes env vars from `.env/iceberg.env` as Jinja template variables into `001-init.sql`.
+SQL files use Snowflake CLI **standard templating** with `<% ctx.env.VAR %>` placeholders (not Jinja `{{ }}`). Values come from the env vars exported by `task` from `.env/iceberg.env`, surfaced through `snowflake.yml` in the execution directory. `snowflake.yml` must be in the CWD where `snow sql` runs (`tasks/snow-cli/`). See memory for the full variable-passing convention.
 
 ### snow-cli Task Directory
 
 The `snow-cli` taskfile is included with `dir: ./tasks/snow-cli`, so all paths within `snowcli-tasks.yml` are relative to `tasks/snow-cli/` (e.g., `cmd/create-external-volume.sh`, not `tasks/snow-cli/cmd/...`). Output files use `../../output/` to reach the repo root.
+
+## Iceberg V3 Feature Coverage
+
+The demo maps to the Snowflake-Labs quickstart *"Enterprise Lakehouse Platform for Iceberg V3"*. When adding features, prefer closing the gaps below over duplicating what already exists.
+
+**Demonstrated:** `ICEBERG_VERSION_DEFAULT = 3`, VARIANT + semi-structured queries, GEOGRAPHY + H3 geospatial, DEFAULT column values, dynamic Iceberg tables (incl. `REFRESH_MODE = INCREMENTAL`), masking policies, tags, DMFs, native semantic view, Cortex Agent, `ML.FORECAST`, Snowpipe Streaming, OpenLineage external lineage (JWT), Spark 4.0 cross-engine read (`variant_get`).
+
+**Not yet demonstrated (candidate improvements):** merge-on-read / deletion vectors (`MERGE`/`DELETE`/`UPDATE` on Iceberg), explicit row lineage (`_row_id`), time travel (`AT`/`BEFORE`), snapshot/history inspection, schema evolution (`ADD`/`DROP`/`RENAME COLUMN`), partitioning/clustering (`CLUSTER BY`, auto-clustering, search optimization), table maintenance & monitoring (snapshot expiration, storage metrics), GEOMETRY type. See the "Iceberg V3 Feature Coverage" section in `README.md` for the detailed matrix.
+
+> Note: `Taskfile.yml` `spark-demo-up`/`spark-demo-teardown` still reference removed `python-tasks:create-conda-env` / `remove-conda-env` tasks; the current Python tasks are `create-uv-venv` and `run-jupyter`. Fix the wiring before relying on the Spark demo end-to-end.
