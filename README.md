@@ -86,7 +86,7 @@ Teardown also routes by `STORAGE_MODE`:
 | Feature | Requirement |
 |---------|-------------|
 | `STORAGE_MODE=external` | [AWS CLI](https://aws.amazon.com/cli/) + configured AWS credentials |
-| Spark demo | [Conda](https://docs.conda.io/en/latest/miniconda.html) (Miniconda recommended) |
+| Spark demo | [Apache Spark 4.0+](https://spark.apache.org/) + Java 17+ (notebook deps auto-installed into a local venv) |
 | Snowpipe Streaming | `pip install snowpipe-streaming cryptography` + key-pair auth configured |
 
 ### Validate Prerequisites
@@ -94,7 +94,6 @@ Teardown also routes by `STORAGE_MODE`:
 ```bash
 task validate-prerequisites:snowcli
 task validate-prerequisites:awscli    # only needed for external storage mode
-task validate-prerequisites:conda     # only needed for Spark demo
 ```
 
 ## Configuration
@@ -148,13 +147,12 @@ TRUST_POLICY_EXTERNAL_ID=your-external-id
 #### Spark Demo Configuration
 
 ```bash
-CONDA_ENV_NAME=iceberg-lab
+# Auth uses a key-pair JWT from CLI_CONNECTION_NAME (no PAT).
+# The enforced-masking demo reuses DEMO_ANALYST_ROLE_NAME / DEMO_ENGINEER_ROLE_NAME.
 SPARK_HORIZON_CATALOG_URI=https://<account>.snowflakecomputing.com/polaris/api/catalog
 SPARK_CATALOG_NAME=YOUR_DATABASE_NAME
-SPARK_SNOWFLAKE_PAT=YOUR_PAT_HERE
-SPARK_HORIZON_ROLE=session:role:YOUR_ROLE_NAME
-SPARK_ICEBERG_VERSION=1.10.0
-SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
+SPARK_CLOUD_PROVIDER=aws          # aws | gcp | azure (selects the Iceberg cloud bundle)
+SPARK_ICEBERG_VERSION=1.10.1
 ```
 
 ## Available Tasks
@@ -204,14 +202,15 @@ SPARK_NOTEBOOK_PATH=tasks/python/notebook/horizon_v3_variant_spark.ipynb
 | `task snow-cli:generate-fleet-notebook`             | Generate the fleet analytics notebook from its template    |
 | `task snow-cli:deploy-notebook`                     | Deploy notebook to Snowflake                               |
 | `task snow-cli:stream-telemetry`                    | Stream simulated vehicle telemetry via Snowpipe Streaming SDK |
+| `task snow-cli:run-spark-jupyter`                   | Bootstrap a venv and launch the Spark interop notebook in Jupyter |
 | `task snow-cli:drop-database-if-exists`              | Drop database if it exists                                 |
 
-### Python/Spark Tasks
+### Spark Tasks
 
-| Task                              | Description                                           |
-|-----------------------------------|-------------------------------------------------------|
-| `task python-tasks:create-uv-venv`    | Create a `venv` virtual environment using `uv`    |
-| `task python-tasks:run-jupyter`       | Launch the Spark/Jupyter interop notebook         |
+| Task                      | Description                                           |
+|---------------------------|-------------------------------------------------------|
+| `task spark-demo-up`      | Infrastructure + Spark/Jupyter interop notebook       |
+| `task spark-demo-teardown`| Teardown infrastructure (the Spark venv is local)     |
 
 ## Architecture
 
@@ -401,6 +400,7 @@ shirc/
 |   |   |   +-- generate-notebook-generic.sh # Notebook generation (calls .py)
 |   |   |   +-- deploy-notebook.sh           # Notebook deployment
 |   |   |   +-- stream-telemetry.sh          # venv bootstrap + run streaming script
+|   |   |   +-- run-spark-jupyter.sh          # venv bootstrap + launch Spark interop notebook
 |   |   +-- sql/
 |   |   |   +-- init/                        # Init SQL (run before batch-1)
 |   |   |   |   +-- init.sql                     # Warehouse, roles, DB (ICEBERG_VERSION_DEFAULT=3), medallion schemas, stage, EAI
@@ -429,9 +429,9 @@ shirc/
 |   |       +-- snowpipe_streaming/   # Snowpipe Streaming SDK integration
 |   |           +-- stream_telemetry.py   # Vehicle telemetry simulator + external lineage
 |   |           +-- requirements.txt
-|   +-- python/
-|   |   +-- python-tasks.yml          # uv venv / Jupyter task definitions
-|   |   +-- notebook/                 # Spark 4.0 + Horizon REST catalog interop notebook
+|   |       +-- spark/               # Spark 4.0 + Horizon REST catalog interop
+|   |           +-- spark_iceberg_interop.ipynb  # Fleet tables, variant_get, enforced masking
+|   |           +-- requirements.txt
 |   +-- validate-prerequisites/
 |       +-- validate-prerequisite-tasks.yml
 +-- upload/                           # JSON files uploaded to the internal stage
@@ -603,7 +603,7 @@ It keeps the same Smart Fleet IoT Analytics use case, the same data model, and e
 - Snowflake-managed storage as the default; VARIANT + semi-structured queries; time-series and geospatial (GEOGRAPHY) analytics; `ML.FORECAST`
 - Governance (masking policies, DMFs, classification tags), Snowpipe Streaming, Open-Meteo API ingestion (`OPEN_METEO_ACCESS`), a Cortex / Snowflake Intelligence agent
 - Cross-region replication and cross-region inference (covered as guided steps in the deployed notebook)
-- Spark 4.0 cross-engine reads via the Horizon Iceberg REST catalog with vended credentials
+- Spark 4.0 cross-engine reads via the Horizon Iceberg REST catalog with vended credentials, including **masking policies enforced cross-engine** (full PII for the engineer role, masked for `FLEET_ANALYST`)
 
 ### How SHIRC differs
 
@@ -632,7 +632,7 @@ It keeps the same Smart Fleet IoT Analytics use case, the same data model, and e
 | `ML.FORECAST` predictive maintenance | fleet notebook |
 | Snowpipe Streaming ingestion | `pyutil/snowpipe_streaming/stream_telemetry.py` |
 | Cross-region replication + cross-region inference | fleet notebook (`FLEET_ANALYTICS_REPLICATION`) |
-| Cross-engine Spark 4.0 read via Horizon REST catalog | `tasks/python/notebook/` |
+| Cross-engine Spark 4.0 read + enforced masking via Horizon REST catalog | `pyutil/spark/spark_iceberg_interop.ipynb` |
 
 **Added beyond the quickstart:**
 

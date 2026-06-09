@@ -6,7 +6,6 @@ includes:
   snow-cli:
     taskfile: ./tasks/snow-cli/snowcli-tasks.yml
     dir: ./tasks/snow-cli
-  python-tasks: ./tasks/python/python-tasks.yml
 
 env:
   ENV_DIR: .env
@@ -149,15 +148,12 @@ tasks:
       - task: snow-cli:apply-network-policy
 
   spark-demo-up:
-    desc: Sets up infrastructure, Spark environment, and launches Jupyter
+    desc: Sets up infrastructure, bootstraps a Spark venv, and launches the Jupyter interop notebook.
     cmds:
       - task: infrastructure-up
-      - task: validate-prerequisites:conda
-      - task: python-tasks:create-conda-env
-      - task: python-tasks:run-jupyter
+      - task: snow-cli:run-spark-jupyter
 
   spark-demo-teardown:
-    desc: Tears down Spark environment and infrastructure.
+    desc: Tears down infrastructure (routes by STORAGE_MODE). The Spark venv is just a local directory.
     cmds:
-      - task: python-tasks:remove-conda-env
       - task: demo-teardown

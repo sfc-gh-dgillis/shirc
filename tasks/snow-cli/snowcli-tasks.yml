@@ -79,6 +79,12 @@ tasks:
     cmds:
       - cmd/stream-telemetry.sh {{.EVENT_COUNT}}
 
+  run-spark-jupyter:
+    desc: Bootstraps a venv and launches the Spark + Horizon REST catalog interop notebook in Jupyter.
+    internal: true
+    cmds:
+      - cmd/run-spark-jupyter.sh
+
   apply-network-policy:
     desc: Creates an INGRESS network rule (current IP) and a network policy (run only if streaming connections fail).
     internal: true

@@ -123,7 +123,7 @@ Init SQL runs three files in sequence: `sql/init/init.sql` (warehouse, roles, da
 
 ### Spark Interoperability
 
-`tasks/python/notebook/` contains a Spark 4.0 notebook that reads the Iceberg V3 tables (including `variant_get` on VARIANT columns) through the Snowflake Horizon REST catalog with vended credentials. `task spark-demo-up` provisions infrastructure and launches Jupyter.
+`tasks/snow-cli/pyutil/spark/spark_iceberg_interop.ipynb` is a Spark 4.0 notebook that reads the fleet Iceberg V3 tables (including `variant_get` on the `TELEMETRY_DATA` VARIANT column) through the Snowflake Horizon REST catalog with vended credentials. It authenticates with a **key-pair JWT** minted via `snow connection generate-jwt` (no PAT) and demonstrates **masking policies enforced cross-engine** — full PII as the engineer role vs masked PII as `FLEET_ANALYST`. `task spark-demo-up` provisions infrastructure then runs `snow-cli:run-spark-jupyter`, which bootstraps a venv via `cmd/run-spark-jupyter.sh` (uv/venv pattern, no conda; requires Java 17+) and launches Jupyter.
 
 ### Output Files
 
@@ -160,9 +160,7 @@ tasks/
     pyutil/snowcliput/             # Python utility for uploading files to Snowflake stages
     pyutil/snowclisp/              # Python utility that runs the batch-1 SQL pipeline in order
     pyutil/snowpipe_streaming/     # Snowpipe Streaming simulator + external lineage (stream_telemetry.py)
-  python/
-    python-tasks.yml               # uv venv + Jupyter tasks
-    notebook/                      # Spark 4.0 + Horizon REST catalog interop notebook
+    pyutil/spark/                  # Spark 4.0 + Horizon REST interop notebook (spark_iceberg_interop.ipynb)
   validate-prerequisites/
     validate-prerequisite-tasks.yml
 output/                            # Generated files (git-ignored)
@@ -187,4 +185,3 @@ This repo is a reimplementation of the Snowflake-Labs quickstart *"Enterprise La
 
 **Beyond both the guide and this repo** (broader Iceberg V3 surface not covered by either): merge-on-read / deletion vectors (`MERGE`/`DELETE`/`UPDATE` on Iceberg), explicit row lineage (`_row_id`), time travel (`AT`/`BEFORE`), snapshot/history inspection, schema evolution (`ADD`/`DROP`/`RENAME COLUMN`), partitioning/clustering (`CLUSTER BY`, auto-clustering, search optimization), table maintenance & monitoring (snapshot expiration, storage metrics), GEOMETRY type. See the "Relationship to the Snowflake Quickstart" section in `README.md` for the detailed matrix.
 
-> Note: `Taskfile.yml` `spark-demo-up`/`spark-demo-teardown` still reference removed `python-tasks:create-conda-env` / `remove-conda-env` tasks; the current Python tasks are `create-uv-venv` and `run-jupyter`. Fix the wiring before relying on the Spark demo end-to-end.

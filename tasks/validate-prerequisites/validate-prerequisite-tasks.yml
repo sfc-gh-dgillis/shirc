@@ -13,9 +13,3 @@ tasks:
     internal: true
     cmds:
       - ./tasks/validate-prerequisites/cmd/validate-snowcli.sh
-
-  conda:
-    desc: Validates that conda is installed.
-    internal: true
-    cmds:
-      - ./tasks/validate-prerequisites/cmd/validate-conda.sh
