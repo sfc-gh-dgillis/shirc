@@ -2,6 +2,17 @@
 
 > Automated setup and management of Snowflake infrastructure for Apache Iceberg tables
 
+> **Based on the Snowflake quickstart _"Enterprise Lakehouse Platform for Iceberg V3"_.**
+> This project is a reimplementation of the official Smart Fleet IoT Analytics demo from:
+> - Guide: <https://www.snowflake.com/en/developers/guides/iceberg-v3-tables-comprehensive-guide/>
+> - Assets: <https://github.com/Snowflake-Labs/sfquickstarts/tree/master/site/sfguides/src/iceberg-v3-tables-comprehensive-guide>
+>
+> SHIRC keeps the same use case, data model, and feature scope, but swaps the guide's
+> single `setup.sh` + `config.env` for a modular [Task](https://taskfile.dev/)-driven
+> workflow, and adds a few enhancements (notably OpenLineage external lineage). See
+> [Relationship to the Snowflake Quickstart](#relationship-to-the-snowflake-quickstart)
+> for a full diff.
+
 ## Overview
 
 SHIRC provides automated infrastructure setup for working with Apache Iceberg tables through Snowflake's Horizon REST catalog. Using Task automation, it handles:
@@ -576,11 +587,37 @@ The deployed notebook and streaming script demonstrate:
 - Real-time ingestion via the Snowpipe Streaming SDK
 - Cross-engine access from Spark 4.0 via the Horizon REST catalog (`variant_get`)
 
-## Iceberg V3 Feature Coverage
+## Relationship to the Snowflake Quickstart
 
-This demo maps to the Snowflake-Labs quickstart *"Enterprise Lakehouse Platform for Iceberg V3"*. The table below shows which Iceberg V3 / lakehouse capabilities are demonstrated today versus not yet covered.
+SHIRC is a reimplementation of the Snowflake-Labs quickstart **"Enterprise Lakehouse Platform for Iceberg V3"**:
 
-**Demonstrated:**
+- **Guide:** <https://www.snowflake.com/en/developers/guides/iceberg-v3-tables-comprehensive-guide/>
+- **Assets:** <https://github.com/Snowflake-Labs/sfquickstarts/tree/master/site/sfguides/src/iceberg-v3-tables-comprehensive-guide>
+
+It keeps the same Smart Fleet IoT Analytics use case, the same data model, and essentially the same feature scope. The differences below are about **how** the demo is delivered, not **what** it teaches.
+
+### Same as the quickstart
+
+- The 6 source Iceberg tables (`VEHICLE_TELEMETRY_STREAM`, `MAINTENANCE_LOGS`, `SENSOR_READINGS`, `VEHICLE_LOCATIONS`, `VEHICLE_REGISTRY`, `API_WEATHER_DATA`)
+- The 4 dynamic tables (`TELEMETRY_ENRICHED`, `MAINTENANCE_ANALYSIS`, `DAILY_FLEET_SUMMARY`, `VEHICLE_HEALTH_SCORE`)
+- Snowflake-managed storage as the default; VARIANT + semi-structured queries; time-series and geospatial (GEOGRAPHY) analytics; `ML.FORECAST`
+- Governance (masking policies, DMFs, classification tags), Snowpipe Streaming, Open-Meteo API ingestion (`OPEN_METEO_ACCESS`), a Cortex / Snowflake Intelligence agent
+- Cross-region replication and cross-region inference (covered as guided steps in the deployed notebook)
+- Spark 4.0 cross-engine reads via the Horizon Iceberg REST catalog with vended credentials
+
+### How SHIRC differs
+
+| Area | Quickstart | SHIRC |
+|------|-----------|-------|
+| Orchestration | Single `setup.sh` + `config.env` | Modular [Task](https://taskfile.dev/) workflow + `.env/iceberg.env`, SQL split into ordered scripts `001`–`010` |
+| External storage providers | S3, GCS, Azure Blob/ADLS Gen2, OneLake | Snowflake-managed **and AWS S3 only** — but with full cross-account IAM policy/role/trust automation |
+| Semantic layer | Ships a `fleet_semantic_model.yaml` semantic model file | Builds a native in-database `CREATE SEMANTIC VIEW` (`009-create_semantic_view.sql`) |
+| Notebook | Static `fleet_analytics_notebook.ipynb` | Generated from a template via `variables.json`, then deployed with `snow` |
+| Lineage | (not covered) | **Adds OpenLineage external lineage** via JWT to `/api/v2/lineage/external-lineage` + `GRANT INGEST LINEAGE ON ACCOUNT` |
+
+### Feature coverage matrix
+
+**Demonstrated (parity with the quickstart):**
 
 | Capability | Where |
 |------------|-------|
@@ -591,12 +628,20 @@ This demo maps to the Snowflake-Labs quickstart *"Enterprise Lakehouse Platform 
 | Dynamic Iceberg tables (incl. `REFRESH_MODE = INCREMENTAL`) | `003-create_dynamic_tables.sql` |
 | Governance: masking policies, tags, DMFs | `005/006/007-*.sql` |
 | Native semantic view + Cortex Agent | `009/010-*.sql` |
+| Open-Meteo API ingestion + external access integration | `001/008-*.sql`, notebook (`OPEN_METEO_ACCESS`) |
 | `ML.FORECAST` predictive maintenance | fleet notebook |
 | Snowpipe Streaming ingestion | `pyutil/snowpipe_streaming/stream_telemetry.py` |
-| External (OpenLineage) lineage via JWT | `stream_telemetry.py` → `/api/v2/lineage/external-lineage` |
+| Cross-region replication + cross-region inference | fleet notebook (`FLEET_ANALYTICS_REPLICATION`) |
 | Cross-engine Spark 4.0 read via Horizon REST catalog | `tasks/python/notebook/` |
 
-**Not yet demonstrated (gaps / candidate improvements):**
+**Added beyond the quickstart:**
+
+| Capability | Where |
+|------------|-------|
+| External (OpenLineage) lineage via JWT | `stream_telemetry.py` → `/api/v2/lineage/external-lineage` |
+| Cross-account AWS S3 / IAM trust automation | `tasks/aws-cli/` |
+
+**Beyond both the guide and this repo** (broader Iceberg V3 surface area not covered by either):
 
 | Capability | Notes |
 |------------|-------|
@@ -606,11 +651,13 @@ This demo maps to the Snowflake-Labs quickstart *"Enterprise Lakehouse Platform 
 | Snapshot / table history inspection | No snapshot/history queries |
 | Schema evolution (`ADD`/`DROP`/`RENAME COLUMN`) | Not demonstrated |
 | Partitioning / clustering (`CLUSTER BY`, auto-clustering, search optimization) | No partition spec or clustering keys |
-| Table maintenance & monitoring (snapshot expiration, storage metrics) | Guide's "Table Maintenance" section is not yet implemented |
+| Table maintenance & monitoring (snapshot expiration, storage metrics) | Not implemented |
 | GEOMETRY type | Only GEOGRAPHY is used |
 
 ## Resources
 
+- [Enterprise Lakehouse Platform for Iceberg V3 (quickstart guide)](https://www.snowflake.com/en/developers/guides/iceberg-v3-tables-comprehensive-guide/) - The guide this project is based on
+- [sfquickstarts assets folder](https://github.com/Snowflake-Labs/sfquickstarts/tree/master/site/sfguides/src/iceberg-v3-tables-comprehensive-guide) - Source SQL, notebooks, and sample data for the guide
 - [Apache Iceberg](https://iceberg.apache.org/) - Open table format specification
 - [Snowflake Iceberg Tables](https://docs.snowflake.com/en/user-guide/tables-iceberg) - Snowflake Iceberg documentation
 - [Snowpipe Streaming](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-overview) - Real-time ingestion
