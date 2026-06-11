@@ -26,11 +26,11 @@ fi
 
 echo "Deploying notebook to Snowflake..."
 echo "  Project: $PROJECT_DIR"
-echo "  Connection: $CLI_CONNECTION_NAME"
+echo "  Connection: $CLI_KEYPAIR_CONNECTION_NAME"
 echo ""
 
 # Deploy the notebook using snow CLI with project path
-snow notebook deploy --connection "$CLI_CONNECTION_NAME" --replace --project "$PROJECT_DIR"
+snow notebook deploy --connection "$CLI_KEYPAIR_CONNECTION_NAME" --replace --project "$PROJECT_DIR"
 
 if [ $? -eq 0 ]; then
     echo ""

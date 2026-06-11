@@ -123,7 +123,7 @@ Init SQL runs three files in sequence: `sql/init/init.sql` (warehouse, roles, da
 
 ### Spark Interoperability
 
-`tasks/snow-cli/pyutil/spark/spark_iceberg_interop.ipynb` is a Spark 4.0 notebook that reads the fleet Iceberg V3 tables (including `variant_get` on the `TELEMETRY_DATA` VARIANT column) through the Snowflake Horizon REST catalog with vended credentials. It uses **two** named `snow` CLI connections (same account/user): a **key-pair** connection (`SPARK_KEYPAIR_CONNECTION_NAME`) that mints the Horizon REST catalog **JWT** via `snow connection generate-jwt` (no PAT — `generate-jwt` mandatorily requires a private-key connection), and a **password** connection (`SPARK_PASSWORD_CONNECTION_NAME`) that drives the `spark-snowflake` connector (`spark.snowflake.sfPassword`) and supplies account/user/role. It demonstrates **masking policies enforced cross-engine** — full PII as the engineer role vs masked PII as `FLEET_ANALYST`. `task spark-demo-up` provisions infrastructure then runs `snow-cli:run-spark-jupyter`, which bootstraps a venv via `cmd/run-spark-jupyter.sh` (uv/venv pattern, no conda; requires Java 17+) and launches Jupyter.
+`tasks/snow-cli/pyutil/spark/spark_iceberg_interop.ipynb` is a Spark 4.0 notebook that reads the fleet Iceberg V3 tables (including `variant_get` on the `TELEMETRY_DATA` VARIANT column) through the Snowflake Horizon REST catalog with vended credentials. It uses **two** named `snow` CLI connections (same account): the project's shared **key-pair** connection (`CLI_KEYPAIR_CONNECTION_NAME`, also used by streaming and notebook deploy) that mints the Horizon REST catalog **JWT** via `snow connection generate-jwt` (no PAT — `generate-jwt` mandatorily requires a private-key connection), and a **password** connection (`SPARK_PASSWORD_CONNECTION_NAME`) that drives the `spark-snowflake` connector (`spark.snowflake.sfPassword`) and supplies account/user/role. The Spark-only vars live in their own `.env/spark.env` (copied from `.env/spark.env.template`), which `cmd/run-spark-jupyter.sh` sources in addition to the shared `.env/iceberg.env`. It demonstrates **masking policies enforced cross-engine** — full PII as the engineer role vs masked PII as `FLEET_ANALYST`. `task spark-demo-up` provisions infrastructure then runs `snow-cli:run-spark-jupyter`, which bootstraps a venv via `cmd/run-spark-jupyter.sh` (uv/venv pattern, no conda; requires Java 17+) and launches Jupyter.
 
 ### Output Files
 
@@ -144,7 +144,8 @@ Tasks are stateful and share data via these JSON files. Tasks like `delete-iam-p
 ```
 Taskfile.yml                       # Root orchestration, includes sub-taskfiles
 .env/
-  iceberg.env.template             # Copy to iceberg.env and configure
+  iceberg.env.template             # Copy to iceberg.env and configure (shared demo config)
+  spark.env.template               # Copy to spark.env (Spark connector creds + runtime; Spark demo only)
 tasks/
   aws-cli/
     awscli-tasks.yml               # AWS CLI task definitions

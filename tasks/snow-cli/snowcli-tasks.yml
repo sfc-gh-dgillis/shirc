@@ -6,7 +6,7 @@ tasks:
     desc: Sorts and processes all SQL files in the given directory. Sorts and executes SQL files with numeric prefixes (e.g., 001-schema.sql)
     internal: true
     cmds:
-      - python3 pyutil/snowclisp/snowclisp.py "{{.SQL_SORT_PROCESS_DIR}}" "{{.CLI_CONNECTION_NAME}}" --prefix-file sql/whoami.sql
+      - python3 pyutil/snowclisp/snowclisp.py "{{.SQL_SORT_PROCESS_DIR}}" "{{.CLI_KEYPAIR_CONNECTION_NAME}}" --prefix-file sql/whoami.sql
 
   create-external-volume:
     desc: Creates a Snowflake external volume using the Snow CLI.
@@ -45,13 +45,13 @@ tasks:
       FILE_UPLOAD_DIR: '{{.FILE_UPLOAD_DIR | default "../../upload"}}'
       INTERNAL_NAMED_STAGE: '@{{.DEMO_DATABASE_NAME | default ""}}.{{.DEMO_SCHEMA_NAME_BRONZE | default ""}}.{{.DEMO_INTERNAL_NAMED_STAGE | default ""}}'
     cmds:
-      - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
+      - python3 pyutil/snowcliput/snowcliput.py "{{.FILE_UPLOAD_DIR}}" "{{.CLI_KEYPAIR_CONNECTION_NAME}}" "{{.INTERNAL_NAMED_STAGE}}"
 
   drop-database-if-exists:
     desc: Drops the specified Snowflake database if it exists using the Snowflake CLI.
     internal: true
     cmds:
-      - snow sql --connection "{{.CLI_CONNECTION_NAME}}" --query "DROP DATABASE IF EXISTS {{.DEMO_DATABASE_NAME}};"
+      - snow sql --connection "{{.CLI_KEYPAIR_CONNECTION_NAME}}" --query "DROP DATABASE IF EXISTS {{.DEMO_DATABASE_NAME}};"
 
   generate-fleet-notebook:
     desc: Generates fleet analytics notebook from template with variable substitution.

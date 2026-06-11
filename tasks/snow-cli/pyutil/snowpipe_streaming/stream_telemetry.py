@@ -24,14 +24,14 @@ This script is normally launched by go-task::
     task stream-telemetry EVENT_COUNT=100   # exits after 100 events
 
 Task exports ``.env/iceberg.env`` into the subprocess, so all
-``DEMO_*`` and ``CLI_CONNECTION_NAME`` variables are available via
+``DEMO_*`` and ``CLI_KEYPAIR_CONNECTION_NAME`` variables are available via
 ``os.getenv``. The ``--events N`` CLI flag (added by ``main()``) overrides
 the default duration-based stop condition.
 
 Connection
 ----------
 Authentication piggy-backs on the named ``snow`` CLI connection
-identified by ``CLI_CONNECTION_NAME``. ``_load_named_connection()`` reads
+identified by ``CLI_KEYPAIR_CONNECTION_NAME``. ``_load_named_connection()`` reads
 either ``~/.snowflake/connections.toml`` or ``[connections.<name>]`` in
 ``~/.snowflake/config.toml`` and normalizes the snow-CLI alias
 ``private_key_path`` to ``private_key_file`` so keypair auth works
@@ -79,15 +79,15 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 # --- Target object identity (medallion: BRONZE / RAW) ----------------------
-CLI_CONNECTION_NAME = os.getenv('CLI_CONNECTION_NAME')
+CLI_KEYPAIR_CONNECTION_NAME = os.getenv('CLI_KEYPAIR_CONNECTION_NAME')
 SNOWFLAKE_DATABASE = os.getenv('DEMO_DATABASE_NAME', 'FLEET_ANALYTICS_DB')
 SNOWFLAKE_SCHEMA = os.getenv('DEMO_SCHEMA_NAME_BRONZE', 'RAW')
 SNOWFLAKE_TABLE = 'VEHICLE_TELEMETRY_STREAM'  # created by 001-create_iceberg_tables.sql
 SNOWFLAKE_WAREHOUSE = os.getenv('DEMO_WAREHOUSE_NAME', 'FLEET_ANALYTICS_WH')
 
-if not CLI_CONNECTION_NAME:
+if not CLI_KEYPAIR_CONNECTION_NAME:
     # Hard failure: without a connection name we can't authenticate.
-    print("ERROR: CLI_CONNECTION_NAME is not set in .env/iceberg.env")
+    print("ERROR: CLI_KEYPAIR_CONNECTION_NAME is not set in .env/iceberg.env")
     sys.exit(1)
 
 # --- Workload shape --------------------------------------------------------
@@ -140,7 +140,7 @@ def _generate_jwt() -> str:
     """
     import subprocess
 
-    cmd = ["snow", "connection", "generate-jwt", "--connection", CLI_CONNECTION_NAME, "--silent"]
+    cmd = ["snow", "connection", "generate-jwt", "--connection", CLI_KEYPAIR_CONNECTION_NAME, "--silent"]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except FileNotFoundError:
@@ -567,12 +567,12 @@ def create_streaming_client():
         print("ERROR: snowpipe-streaming package missing. Run: pip install snowpipe-streaming")
         sys.exit(1)
 
-    print(f"Resolving CLI connection '{CLI_CONNECTION_NAME}'...")
-    params = _load_named_connection(CLI_CONNECTION_NAME)
+    print(f"Resolving CLI connection '{CLI_KEYPAIR_CONNECTION_NAME}'...")
+    params = _load_named_connection(CLI_KEYPAIR_CONNECTION_NAME)
 
     if not params.get("private_key_file"):
         print(
-            f"ERROR: connection '{CLI_CONNECTION_NAME}' has no private_key_file. "
+            f"ERROR: connection '{CLI_KEYPAIR_CONNECTION_NAME}' has no private_key_file. "
             "Snowpipe Streaming requires keypair auth."
         )
         sys.exit(1)
@@ -638,7 +638,7 @@ def main():
     print("=" * 60)
     print("Snowflake Iceberg V3 - Streaming Telemetry Simulator")
     print("=" * 60)
-    print(f"Connection: {CLI_CONNECTION_NAME}")
+    print(f"Connection: {CLI_KEYPAIR_CONNECTION_NAME}")
     print(f"Database: {SNOWFLAKE_DATABASE}")
     print(f"Table: {SNOWFLAKE_SCHEMA}.{SNOWFLAKE_TABLE}")
     print(f"Pipe: {SNOWFLAKE_TABLE}-STREAMING (Snowpipe Streaming SDK)")

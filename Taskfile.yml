@@ -23,7 +23,7 @@ tasks:
       - task: snow-cli:sort-and-process-sql-folder
         vars:
           SQL_SORT_PROCESS_DIR: sql/batch-1
-          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
+          CLI_KEYPAIR_CONNECTION_NAME: $CLI_KEYPAIR_CONNECTION_NAME
       - task: snow-cli:generate-fleet-notebook
       - task: snow-cli:deploy-notebook
 
@@ -101,7 +101,7 @@ tasks:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:drop-database-if-exists
         vars:
-          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
+          CLI_KEYPAIR_CONNECTION_NAME: $CLI_KEYPAIR_CONNECTION_NAME
           DEMO_DATABASE_NAME: $DEMO_DATABASE_NAME
       - task: snow-cli:drop-external-volume
         vars:
@@ -132,7 +132,7 @@ tasks:
       - task: validate-prerequisites:snowcli
       - task: snow-cli:drop-database-if-exists
         vars:
-          CLI_CONNECTION_NAME: $CLI_CONNECTION_NAME
+          CLI_KEYPAIR_CONNECTION_NAME: $CLI_KEYPAIR_CONNECTION_NAME
           DEMO_DATABASE_NAME: $DEMO_DATABASE_NAME
 
   stream-telemetry:
