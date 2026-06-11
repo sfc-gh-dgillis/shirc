@@ -7,24 +7,6 @@ set -euo pipefail
 # Usage: ./run-spark-jupyter.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Load Spark-specific env (separate from the shared .env/iceberg.env that Task
-# already loads). Exported so the Jupyter kernel inherits these vars. The shared
-# keypair connection (CLI_KEYPAIR_CONNECTION_NAME) and DEMO_*/AWS_REGION come
-# from iceberg.env via Task's global dotenv.
-SPARK_ENV_FILE="${SPARK_ENV_FILE:-$SCRIPT_DIR/../../../.env/spark.env}"
-if [ -f "$SPARK_ENV_FILE" ]; then
-    echo "Loading Spark env from $SPARK_ENV_FILE"
-    set -a
-    # shellcheck disable=SC1090
-    . "$SPARK_ENV_FILE"
-    set +a
-else
-    echo "ERROR: Spark env file not found at $SPARK_ENV_FILE" >&2
-    echo "       Create it with: cp .env/spark.env.template .env/spark.env" >&2
-    exit 1
-fi
-
 SPARK_DIR="$SCRIPT_DIR/../pyutil/spark"
 VENV_DIR="${SPARK_VENV_DIR:-$SCRIPT_DIR/../../../.venv-spark}"
 REQUIREMENTS_FILE="$SPARK_DIR/requirements.txt"

@@ -146,23 +146,16 @@ TRUST_POLICY_EXTERNAL_ID=your-external-id
 
 #### Spark Demo Configuration
 
-The Spark demo has its **own** env file. Copy the template:
+These vars live in the same `.env/iceberg.env`:
 
 ```bash
-cp .env/spark.env.template .env/spark.env
-```
-
-```bash
-# .env/spark.env (loaded by cmd/run-spark-jupyter.sh, in addition to iceberg.env)
-#
-# The Spark demo uses TWO snow CLI connections (same account):
-#   - CLI_KEYPAIR_CONNECTION_NAME (set in .env/iceberg.env): the project's shared
-#     key-pair connection that mints the Horizon REST catalog JWT via
+# The Spark demo uses TWO snow CLI connections (same Snowflake account):
+#   - CLI_KEYPAIR_CONNECTION_NAME (set above): the project's shared key-pair
+#     connection that mints the Horizon REST catalog JWT via
 #     `snow connection generate-jwt` (no PAT). Also used by streaming/deploy.
-#   - SPARK_PASSWORD_CONNECTION_NAME (below): a password connection for the
-#     spark-snowflake connector.
-# account/user/role and the catalog URI are derived from the password connection;
-# the enforced-masking demo reuses DEMO_ANALYST_ROLE_NAME / DEMO_ENGINEER_ROLE_NAME.
+#   - SPARK_PASSWORD_CONNECTION_NAME: a password connection for the
+#     spark-snowflake connector; account/user/role are derived from it.
+# The enforced-masking demo reuses DEMO_ANALYST_ROLE_NAME / DEMO_ENGINEER_ROLE_NAME.
 SPARK_PASSWORD_CONNECTION_NAME=your_password_connection
 # Export the connector password (NAME = PASSWORD connection name uppercased), e.g.:
 #   export SNOWFLAKE_CONNECTIONS_YOUR_PASSWORD_CONNECTION_PASSWORD="..."
