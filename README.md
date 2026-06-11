@@ -147,14 +147,18 @@ TRUST_POLICY_EXTERNAL_ID=your-external-id
 #### Spark Demo Configuration
 
 ```bash
-# The Spark demo reads account/user/role from SPARK_CLI_CONNECTION_NAME
-# (~/.snowflake/connections.toml or config.toml) and derives the catalog URI.
-# The Horizon REST catalog auths with a key-pair JWT (no PAT); the spark-snowflake
-# connector auths with the connection user + a password env var.
+# The Spark demo uses TWO snow CLI connections (same account/user), in
+# ~/.snowflake/connections.toml or config.toml:
+#   - SPARK_KEYPAIR_CONNECTION_NAME: a key-pair connection that mints the Horizon
+#     REST catalog JWT via `snow connection generate-jwt` (no PAT). generate-jwt
+#     REQUIRES a connection with a private key.
+#   - SPARK_PASSWORD_CONNECTION_NAME: a password connection for the spark-snowflake
+#     connector; account/user/role and the catalog URI are derived from it.
 # The enforced-masking demo reuses DEMO_ANALYST_ROLE_NAME / DEMO_ENGINEER_ROLE_NAME.
-SPARK_CLI_CONNECTION_NAME=your_snowflake_connection
-# Export the connector password (NAME = connection name uppercased), e.g.:
-#   export SNOWFLAKE_CONNECTIONS_YOUR_SNOWFLAKE_CONNECTION_PASSWORD="..."
+SPARK_KEYPAIR_CONNECTION_NAME=your_keypair_connection
+SPARK_PASSWORD_CONNECTION_NAME=your_password_connection
+# Export the connector password (NAME = PASSWORD connection name uppercased), e.g.:
+#   export SNOWFLAKE_CONNECTIONS_YOUR_PASSWORD_CONNECTION_PASSWORD="..."
 SPARK_CATALOG_NAME=YOUR_DATABASE_NAME
 SPARK_CLOUD_PROVIDER=aws          # aws | gcp | azure (selects the Iceberg cloud bundle)
 SPARK_ICEBERG_VERSION=1.10.1
