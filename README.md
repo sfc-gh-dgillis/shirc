@@ -33,10 +33,12 @@ SHIRC provides automated infrastructure setup for working with Apache Iceberg ta
 cp .env/iceberg.env.template .env/iceberg.env
 # Edit .env/iceberg.env with your Snowflake values (STORAGE_MODE=managed is the default)
 
-# 2a. Set up Snowflake notebook demo
+# 2. Set up the demo (infrastructure + fleet tables + governance + Snowflake notebook)
 task demo-up
 
-# 2b. OR set up local Spark + Jupyter demo
+# 3. (Optional) Also explore the same tables from local Spark + Jupyter.
+#    Requires `task demo-up` to have run first — it reads the fleet tables that
+#    demo-up creates. This is an add-on, not an alternative.
 task spark-demo-up
 ```
 
@@ -172,7 +174,7 @@ SPARK_ICEBERG_VERSION=1.10.1
 | `task infrastructure-up`  | Sets up infrastructure (routes by `STORAGE_MODE`)                   |
 | `task demo-up`            | Infrastructure + Snowflake notebook deployment                      |
 | `task demo-teardown`      | Teardown (routes by `STORAGE_MODE`)                                 |
-| `task spark-demo-up`      | Infrastructure + Spark/Jupyter environment                          |
+| `task spark-demo-up`      | Spark/Jupyter interop environment (**run `task demo-up` first** — reads its fleet tables) |
 | `task spark-demo-teardown`| Teardown Spark environment + infrastructure                         |
 | `task apply-network-policy` | Optional - creates INGRESS network rule + policy for streaming (see Troubleshooting) |
 
@@ -217,7 +219,7 @@ SPARK_ICEBERG_VERSION=1.10.1
 
 | Task                      | Description                                           |
 |---------------------------|-------------------------------------------------------|
-| `task spark-demo-up`      | Infrastructure + Spark/Jupyter interop notebook       |
+| `task spark-demo-up`      | Spark/Jupyter interop notebook (**run `task demo-up` first** — reads its fleet tables) |
 | `task spark-demo-teardown`| Teardown infrastructure (the Spark venv is local)     |
 
 ## Architecture
