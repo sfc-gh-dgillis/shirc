@@ -77,3 +77,15 @@ GRANT ALL ON FUTURE DYNAMIC TABLES IN DATABASE <% ctx.env.DEMO_DATABASE_NAME %> 
 -- ============================================
 GRANT ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %> TO ROLE <% ctx.env.DEMO_ADMIN_ROLE_NAME %>;
 GRANT ROLE <% ctx.env.DEMO_ANALYST_ROLE_NAME %> TO ROLE <% ctx.env.DEMO_ADMIN_ROLE_NAME %>;
+
+-- ============================================
+-- GRANT DEMO ROLES TO THE EXECUTING USER
+-- ============================================
+-- The Spark + Horizon REST catalog interop demo authenticates with a key-pair
+-- JWT and requests a role via scope=session:role:<role>. The user must be able
+-- to assume that role, so grant the demo roles to whoever runs the setup.
+-- Being ACCOUNTADMIN is NOT sufficient: custom roles must be granted explicitly.
+SET demo_user = CURRENT_USER();
+GRANT ROLE <% ctx.env.DEMO_ENGINEER_ROLE_NAME %> TO USER IDENTIFIER($demo_user);
+GRANT ROLE <% ctx.env.DEMO_ANALYST_ROLE_NAME %> TO USER IDENTIFIER($demo_user);
+GRANT ROLE <% ctx.env.DEMO_ADMIN_ROLE_NAME %> TO USER IDENTIFIER($demo_user);
