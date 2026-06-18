@@ -1,70 +1,54 @@
 {
-  "description": "Variable mapping for fleet_analytics_notebook template generation. Each variable maps a Jinja placeholder to an environment variable (with fallback default).",
+  "description": "Variable mapping for fleet_analytics_notebook template generation. Each variable maps a Jinja placeholder to an environment variable. Values come from .env/iceberg.env (the single source of truth); a missing env var is a hard error.",
   "snowflake_yml_template": "templates/fleet_analytics_snowflake_yml_template.yml",
   "variables": {
     "database_name": {
-      "env": "DEMO_DATABASE_NAME",
-      "default": "FLEET_ANALYTICS_DB"
+      "env": "DEMO_DATABASE_NAME"
     },
     "warehouse_name": {
-      "env": "DEMO_WAREHOUSE_NAME",
-      "default": "FLEET_ANALYTICS_WH"
+      "env": "DEMO_WAREHOUSE_NAME"
     },
     "external_volume_name": {
-      "env": "EXTERNAL_VOLUME_NAME",
-      "default": "FLEET_ICEBERG_VOL"
+      "env": "EXTERNAL_VOLUME_NAME"
     },
     "analyst_role_name": {
-      "env": "DEMO_ANALYST_ROLE_NAME",
-      "default": "FLEET_ANALYST"
+      "env": "DEMO_ANALYST_ROLE_NAME"
     },
     "engineer_role_name": {
-      "env": "DEMO_ENGINEER_ROLE_NAME",
-      "default": "FLEET_ENGINEER"
+      "env": "DEMO_ENGINEER_ROLE_NAME"
     },
     "admin_role_name": {
-      "env": "DEMO_ADMIN_ROLE_NAME",
-      "default": "FLEET_ADMIN"
+      "env": "DEMO_ADMIN_ROLE_NAME"
     },
     "external_access_integration_name": {
-      "env": "DEMO_EXTERNAL_ACCESS_INTEGRATION_NAME",
-      "default": "OPEN_METEO_ACCESS"
+      "env": "DEMO_EXTERNAL_ACCESS_INTEGRATION_NAME"
     },
     "logs_stage_name": {
-      "env": "DEMO_INTERNAL_NAMED_STAGE",
-      "default": "LOGS_STAGE"
+      "env": "DEMO_INTERNAL_NAMED_STAGE"
     },
     "replication_group_name": {
-      "env": "DEMO_REPLICATION_GROUP_NAME",
-      "default": "FLEET_ANALYTICS_REPLICATION"
+      "env": "DEMO_REPLICATION_GROUP_NAME"
     },
     "network_policy_name": {
-      "env": "DEMO_NETWORK_POLICY_NAME",
-      "default": "FLEET_STREAMING_POLICY"
+      "env": "DEMO_NETWORK_POLICY_NAME"
     },
     "schema_bronze": {
-      "env": "DEMO_SCHEMA_NAME_BRONZE",
-      "default": "RAW"
+      "env": "DEMO_SCHEMA_NAME_BRONZE"
     },
     "schema_silver": {
-      "env": "DEMO_SCHEMA_NAME_SILVER",
-      "default": "CURATED"
+      "env": "DEMO_SCHEMA_NAME_SILVER"
     },
     "schema_gold": {
-      "env": "DEMO_SCHEMA_NAME_GOLD",
-      "default": "ANALYTICS"
+      "env": "DEMO_SCHEMA_NAME_GOLD"
     },
     "json_file_format": {
-      "env": "DEMO_JSON_FILE_FORMAT",
-      "default": "JSON_FORMAT"
+      "env": "DEMO_JSON_FILE_FORMAT"
     },
     "agent_name": {
-      "env": "DEMO_AGENT_NAME",
-      "default": "FLEET_ANALYTICS_AGENT"
+      "env": "DEMO_AGENT_NAME"
     },
     "semantic_view_name": {
-      "env": "DEMO_SEMANTIC_VIEW_NAME",
-      "default": "FLEET_ANALYTICS_SV"
+      "env": "DEMO_SEMANTIC_VIEW_NAME"
     }
   }
 }

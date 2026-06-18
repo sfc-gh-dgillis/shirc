@@ -150,7 +150,7 @@ tasks:
   spark-demo-up:
     desc: Sets up infrastructure, bootstraps a Spark venv, and launches the Jupyter interop notebook.
     cmds:
-      - task: infrastructure-up
+#      - task: infrastructure-up
       - task: snow-cli:run-spark-jupyter
 
   spark-demo-teardown:
