@@ -1,4 +1,32 @@
 #!/usr/bin/env bash
+#
+# create-external-volume.sh — create a Snowflake external volume over an S3 bucket.
+#
+# Reads the AWS resources previously provisioned by 'task aws-resources-up'
+# (output/aws-output.json) to pull out the IAM role ARN and bucket URI, derives
+# the storage base URL (optionally under $S3_PREFIX), exports those values so
+# Snow CLI can resolve them via ctx.env, and then executes the given SQL file
+# with 'snow sql -f'.
+#
+# Usage:
+#   create-external-volume.sh SQL_FILE
+#
+# Arguments:
+#   SQL_FILE  Path to the CREATE EXTERNAL VOLUME SQL template
+#             (e.g. sql/init/create_external_volume.sql)
+#
+# Required environment variables:
+#   EXTERNAL_VOLUME_NAME      Name of the external volume to create
+#   TRUST_POLICY_EXTERNAL_ID  External ID used in the IAM role trust policy
+#
+# Optional environment variables:
+#   S3_PREFIX                 Key prefix appended to the bucket URI
+#
+# Prerequisites: jq, snow CLI, and output/aws-output.json from 'task aws-resources-up'.
+#
+# Exits non-zero on missing arguments, environment variables, input files,
+# or if the external volume cannot be created.
+
 set -euo pipefail
 
 # Check if required arguments are provided
