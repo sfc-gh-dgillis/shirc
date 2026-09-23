@@ -5,6 +5,7 @@ SQL File Executor for Snowflake CLI
 Sorts and executes SQL files with numeric prefixes (e.g., 001-schema.sql)
 """
 
+import argparse
 import re
 import subprocess
 import sys
@@ -154,19 +155,33 @@ def execute_sql_files_with_snowflake_cli(
 def main():
     """
     Main entry point for command-line execution.
-    
+
     Usage:
-        python script.py <directory> <connection_name>
+        python script.py <directory> <connection_name> [--prefix-file FILE ...]
     """
-    if len(sys.argv) < 3:
-        print("Usage: python script.py <directory> <connection_name>")
-        print("\nExample:")
-        print("  python script.py ./tasks/sql my_snowflake_connection")
-        sys.exit(1)
-    
-    directory = sys.argv[1]
-    connection_name = sys.argv[2]
-    
+    parser = argparse.ArgumentParser(
+        description="Sort and execute SQL files with numeric prefixes (e.g., 001-schema.sql)"
+    )
+    parser.add_argument("directory", help="Directory containing NNN-*.sql files")
+    parser.add_argument("connection_name", help="Snowflake CLI connection name")
+    parser.add_argument(
+        "--prefix-file",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="SQL file to execute before the sorted files (repeatable)",
+    )
+    args = parser.parse_args()
+
+    directory = args.directory
+    connection_name = args.connection_name
+
+    prefix_files = [Path(p) for p in args.prefix_file]
+    for prefix_file in prefix_files:
+        if not prefix_file.is_file():
+            print(f"ERROR: Prefix file not found: {prefix_file}", file=sys.stderr)
+            sys.exit(1)
+
     try:
         # Get sorted SQL files
         print(f"Scanning directory: {directory}")
@@ -186,12 +201,17 @@ def main():
         for i, sql_file in enumerate(sql_files, 1):
             prefix = extract_numeric_prefix(sql_file.name)
             print(f"  {i}. [{prefix:03d}] {sql_file.name}")
-        
+
+        if prefix_files:
+            print(f"\nPrepending {len(prefix_files)} prefix file(s):")
+            for prefix_file in prefix_files:
+                print(f"  - {prefix_file}")
+
         # Execute all files in one command
         print(f"\nUsing Snowflake connection: {connection_name}")
         success = execute_sql_files_with_snowflake_cli(
             connection_name,
-            sql_files,
+            prefix_files + sql_files,
             verbose=True
         )
         
